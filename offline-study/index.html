@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quantum Science &amp; Technology — Offline Exam Study Guide (107 Questions)</title>
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="data/stage-01.js"></script>
+  <script defer src="data/stage-02.js"></script>
+  <script defer src="data/stage-03.js"></script>
+  <script defer src="data/stage-04.js"></script>
+  <script defer src="data/stage-05.js"></script>
+  <script defer src="data/stage-06.js"></script>
+  <script defer src="data/stage-07.js"></script>
+  <script defer src="data/stage-08.js"></script>
+  <script defer src="data/stage-09.js"></script>
+  <script defer src="data/stage-10.js"></script>
+  <script defer src="data/stage-11.js"></script>
+  <script defer src="data/stage-12.js"></script>
+  <script defer src="data/stage-13.js"></script>
+  <script defer src="data/stage-14.js"></script>
+  <script defer src="data/stage-15.js"></script>
+  <script defer src="data/stage-16.js"></script>
+  <script defer src="data/stage-17.js"></script>
+  <script defer src="data/stage-18.js"></script>
+  <script defer src="data/stage-19.js"></script>
+  <script defer src="data/guide.js"></script>
+  <script defer src="script.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a href="#study" class="brand" id="brand-reset-stage">Quantum Science &amp; Technology</a>
+      <nav class="part-nav" id="header-quick-nav" aria-label="Quick navigation"></nav>
+      <div class="topbar-actions">
+        <button type="button" id="theme-toggle-btn" class="btn btn-outline" aria-pressed="false" aria-label="Switch to dark mode" title="Toggle dark mode">
+          <span id="theme-toggle-icon" aria-hidden="true">🌙</span>
+          <span class="desktop-only" id="theme-toggle-label">Dark</span>
+        </button>
+        <button type="button" id="help-btn" class="btn btn-help" aria-label="Open help guide" title="Quick Help">
+          <span>?</span>
+          <span class="desktop-only">Help</span>
+        </button>
+        <button type="button" id="mobile-menu-btn" class="btn btn-outline mobile-only" aria-label="Open menu and stages">
+          Menu
+        </button>
+        <button type="button" id="reset-progress-btn" class="btn btn-outline" aria-label="Reset progress">
+          <span class="desktop-only">Reset progress</span>
+          <span class="mobile-only">Reset</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="view-switcher-bar">
+    <div class="container view-switcher-inner">
+      <div class="view-switcher-left">
+        <button type="button" id="desktop-sidebar-toggle-btn" class="btn btn-outline desktop-sidebar-btn" aria-expanded="true" aria-label="Hide left sidebar">
+          ☰ Hide menu
+        </button>
+        <div class="view-switcher-group" role="group" aria-label="Choose browsing view">
+          <button type="button" id="switch-study-btn" class="view-switch-btn active" aria-pressed="true">
+            Study Order (learn step by step)
+          </button>
+          <button type="button" id="switch-units-btn" class="view-switch-btn" aria-pressed="false">
+            Unit-wise (exam view)
+          </button>
+        </div>
+        <button type="button" id="open-all-questions-btn" class="btn btn-outline" aria-pressed="false">All Questions (107)</button>
+      </div>
+      <span class="view-switcher-hint" id="view-switcher-hint">Same 107 questions &amp; answers · shared ticks &amp; stars</span>
+    </div>
+  </div>
+
+  <div id="top" class="container layout">
+    <aside class="sidebar" id="sidebar" aria-label="Study stages and guide navigation">
+      <div class="sidebar-header mobile-only">
+        <strong id="sidebar-mobile-title">Menu &amp; Stages</strong>
+        <button type="button" id="close-sidebar-btn" class="btn btn-outline" aria-label="Close menu">Close</button>
+      </div>
+      <div class="sidebar-desktop-head">
+        <span class="sidebar-desktop-label" id="sidebar-desktop-title">Study Stages</span>
+        <button type="button" id="desktop-sidebar-collapse-btn" class="btn-sidebar-hide" aria-label="Hide left sidebar">« Hide</button>
+      </div>
+      <div id="sidebar-content"></div>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+
+    <main class="main-col">
+      <div id="stages-view">
+        <section class="quick-start-box" id="quick-start-box" aria-label="Quick start guide">
+          <div class="quick-start-head">
+            <strong>Quick Start (Read Before You Begin)</strong>
+            <button type="button" id="dismiss-quick-start-btn" class="btn-icon" aria-label="Dismiss quick start">✕</button>
+          </div>
+          <ul id="quick-start-list" class="quick-start-list"></ul>
+          <div class="quick-start-actions">
+            <button type="button" id="qs-open-guide-btn" class="btn btn-primary">Open Full Start Here Guide (Plans &amp; Formulas)</button>
+            <button type="button" id="qs-open-sources-btn" class="btn btn-outline">Sources &amp; Uncovered Topics</button>
+          </div>
+        </section>
+
+        <section class="intro-block" style="margin-top:16px;">
+          <h1>All Mid 1 and Mid 2 Exam Questions with Answers</h1>
+          <p id="intro-subtitle">Study Order View covering all 107 exam-ready answers across 19 progressive stages (Parts A–E), with intuition, clean answer sheets, key formulas, and transparent study sources.</p>
+        </section>
+
+        <section class="toolbar" aria-label="Study controls and progress" style="margin-top:16px;">
+          <div class="toolbar-top">
+            <div>
+              <div class="progress-text" id="progress-text">0 of 107 questions marked done (0%)</div>
+              <div class="progress-sub" id="visible-sub">Showing 107 matching questions</div>
+            </div>
+            <div class="toolbar-buttons">
+              <button type="button" id="expand-all-btn" class="btn btn-secondary">Expand all stages</button>
+              <button type="button" id="practice-toggle-btn" class="btn btn-outline" aria-pressed="false">Practice mode: Off</button>
+            </div>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+          </div>
+          <div class="toolbar-filters">
+            <div class="search-wrap">
+              <label for="search-input" class="sr-only">Search questions, formulas, sources, or stages</label>
+              <input type="search" id="search-input" placeholder="Search any topic, formula, Q#, or tag (e.g. Bloch, Q14, CNOT, Shor)..." />
+            </div>
+            <div class="filter-tabs" role="group" aria-label="Filter by question marks">
+              <button type="button" class="tab-btn active" data-mark="all" aria-pressed="true">All marks</button>
+              <button type="button" class="tab-btn" data-mark="2" aria-pressed="false">2-mark</button>
+              <button type="button" class="tab-btn" data-mark="5" aria-pressed="false">5-mark</button>
+            </div>
+            <button type="button" id="starred-only-btn" class="btn btn-star-filter" aria-pressed="false">★ Starred (0)</button>
+            <button type="button" id="hide-done-btn" class="btn btn-outline" aria-pressed="false">Hide done</button>
+          </div>
+        </section>
+
+        <div id="stages-container" class="stages-list" style="margin-top:16px;"></div>
+        <div id="exam-container" class="exam-list" style="margin-top:16px;" hidden></div>
+      </div>
+
+      <div id="guide-container" hidden></div>
+      <div id="all-questions-container" hidden></div>
+    </main>
+  </div>
+
+  <!-- Help Modal -->
+  <div class="modal-overlay" id="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h2 id="help-modal-title">Quick Help — How This Study Guide Works</h2>
+        <button type="button" id="close-help-btn" class="btn-icon" aria-label="Close help">✕</button>
+      </div>
+      <div id="help-modal-body" class="modal-body"></div>
+      <div class="modal-foot">
+        <div class="modal-foot-links">
+          <button type="button" id="modal-open-guide-btn" class="btn btn-primary">Full Start Here Guide</button>
+          <button type="button" id="modal-open-sources-btn" class="btn btn-outline">View Sources</button>
+        </div>
+        <button type="button" id="modal-close-footer-btn" class="btn btn-outline">Close</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
