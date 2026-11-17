@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { ALL_STAGES } from './data/stages';
 import type { QuestionId, QuestionImage } from './types/study';
 import {
@@ -383,6 +384,8 @@ export default function App() {
         image={lightboxImage}
         onClose={() => setLightboxImage(null)}
       />
+
+      <Analytics />
     </div>
   );
 }
