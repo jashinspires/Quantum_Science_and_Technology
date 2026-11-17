@@ -1,26 +1,38 @@
-window.QST_GUIDE = {
+(function () {
+  const allQs = (window.QST_STAGES || []).flatMap((s) => s.questions || []);
+  const TOTAL_Q = allQs.length;
+  const ORIG_Q = allQs.filter((q) => typeof q.number === 'number').length;
+  const ADDED_Q = allQs.filter((q) => typeof q.number === 'string').length;
+  const TWO_M = allQs.filter((q) => q.marks === 2).length;
+  const FIVE_M = allQs.filter((q) => q.marks === 5).length;
+  const STAGE_N = (window.QST_STAGES || []).length || 19;
+  const SUPP_N = allQs.filter((q) => q.usesTextbookSupplement).length;
+  const WITH_IMG_N = allQs.filter((q) => (q.sections || []).some((sec) => Boolean(sec.image))).length;
+  const NO_IMG_N = TOTAL_Q - WITH_IMG_N;
+
+  window.QST_GUIDE = {
   "quickStartLines": [
-    "This site holds clean, exam-ready answers for all 107 questions (the 87 questions from QST_Mid1_Mid2_Study_Order.pdf plus 20 Unit I & II 2-mark questions from the attached answer booklet), arranged in 19 progressive stages (Parts A–E).",
-    "Start at Part A · Stage 1 (or pick any stage/filter from the menu, or switch to Unit-wise Exam View) and read \"Understand it\" before memorizing \"Write this in the exam\".",
-    "Use Practice mode (top bar) to hide answers, write or say your response from memory, then click \"Show answer\" to check every step and diagram.",
-    "Click \"Mark done\" after mastering a question — saved in this browser only (localStorage) — and open \"Start Here\" or \"?\" anytime for study plans and sources."
+    `This site holds clean, exam-ready answers for all ${TOTAL_Q} questions (${ORIG_Q} questions from QST_Mid1_Mid2_Study_Order.pdf plus ${ADDED_Q} Unit I & II 2-mark questions from the attached answer booklet), arranged across ${STAGE_N} stages (Parts A–E) and 5 syllabus units.`,
+    "Pick Study Order (learn step by step across stages) or Unit-wise (pick a unit, then 2 Marks or 5 Marks) from Home, and read \"Understand it\" before memorizing \"Answer\".",
+    "Use Practice mode in the top bar to hide answers, write or say your response from memory, then click \"Show answer\" to check every step and diagram.",
+    "Click \"Mark done\" or \"Star\" on any question (saved locally in this browser), and open \"Start Here\", \"Sources\", or \"?\" anytime."
   ],
   "helpItems": [
     {
-      "title": "Four Clear Card Sections",
-      "body": "Every question separates study help from exam writing: \"Understand it\" (intuition only), \"Write this in the exam\" (clean textbook prose to write on your answer sheet), \"Remember these\" (quick revision formulas), and \"Source (for study, not for the exam)\"."
+      "title": "Three Clear Card Sections",
+      "body": "Every question separates study help from exam writing: \"Understand it\" (intuition only), \"Answer\" (clean textbook prose to write on your answer sheet), and \"Remember\" (quick revision formulas directly below Answer)."
+    },
+    {
+      "title": "Two Ways to Browse",
+      "body": "Start on Home to choose Study Order (19 progressive stages grouped under Parts A–E) or Unit-wise (Units I–V split into 2-Mark and 5-Mark lists), or use the Search box in the top bar anytime."
     },
     {
       "title": "Practice Mode (Recall Test)",
-      "body": "Click \"Practice mode\" in the top bar to hide all answer sections across cards. Recite 2-mark definitions aloud or sketch 5-mark outlines/circuits on paper first, then press \"Show answer\"."
-    },
-    {
-      "title": "Search & Filters",
-      "body": "Search across questions, exam answers, key terms, and sources, or filter by Remaining, Done, 2 marks, or 5 marks inside any stage."
+      "body": "Click \"Practice\" in the top bar to hide answers. Recite 2-mark definitions aloud or sketch 5-mark outlines/circuits on paper first, then press \"Show answer\"."
     },
     {
       "title": "Browser-Only Progress Saving",
-      "body": "\"Mark done\" is saved only in this browser via localStorage. Clearing site data resets your checkmarks, and progress stays on this device/browser."
+      "body": "\"Mark done\" and \"Star\" are saved only in this browser via localStorage. Clearing site data resets your progress, and progress stays on this device/browser."
     },
     {
       "title": "Offline Use Anytime",
@@ -31,21 +43,21 @@ window.QST_GUIDE = {
     "part1WhatThisIs": {
       "heading": "Part 1 — What This Site Is",
       "bullets": [
-        "Complete QST Exam Companion: Covers all 107 questions across 5 units (87 questions from QST_Mid1_Mid2_Study_Order.pdf plus 20 Unit I & II 2-mark questions added from the attached answer booklet), split into 53 two-mark questions and 54 five-mark questions.",
-        "Reordered Into 19 Learning Stages (Parts A–E): Instead of jumping blindly across syllabi, related concepts sit together so each stage unlocks the next (for example, No-Cloning and Teleportation move into Stage 6 alongside Qubits and Entanglement, and Decoherence sits in Stage 12 next to Quantum Error Correction).",
-        "Exact Source Tags & Sequential Exam Numbering: Every card keeps its original grey tag (for example, \"Mid 1 · Unit II · Q6\", \"Mid 2 · Unit III · Long Q4(b)\", or \"Added from attached PDF · Unit I · Q1\"). In Unit-wise Exam View, every 2-Mark and 5-Mark section is numbered sequentially starting from 1, independent of Study Order IDs.",
-        "How 2-Mark vs. 5-Mark Badges Were Assigned: Mid 2 questions follow the Short (2 marks) and Long (5 marks) labels printed in the Mid 2 PDF and study order PDF. Original Mid 1 questions follow the Short vs. Long classification in the Mid 1 PDF, and the 20 added Unit I & II Short questions come directly from the attached Unit I–V answer booklet.",
-        "Study Help Separated From Exam Text: Only the \"Write this in the exam\" box is written in neutral textbook exam style with zero file names, slide numbers, or hints—so you can study intuitively without accidentally writing \"from Unit 2 PPT\" on your exam script."
+        `Complete QST Exam Companion: Covers all ${TOTAL_Q} questions across 5 units (${ORIG_Q} questions from QST_Mid1_Mid2_Study_Order.pdf plus ${ADDED_Q} Unit I & II 2-mark questions added from the attached answer booklet), split into ${TWO_M} two-mark questions and ${FIVE_M} five-mark questions.`,
+        `Reordered Into ${STAGE_N} Learning Stages (Parts A–E): Instead of jumping blindly across syllabi, related concepts sit together so each stage unlocks the next (for example, No-Cloning and Teleportation move into Stage 6 alongside Qubits and Entanglement, and Decoherence sits in Stage 12 next to Quantum Error Correction).`,
+        "Exact Source Tags & Sequential Exam Numbering: Every question keeps its original grey tag (for example, \"Mid 1 · Unit II · Q6\", \"Mid 2 · Unit III · Long Q4(b)\", or \"Added from attached PDF · Unit I · Q1\"). In Unit-wise, every 2-Mark and 5-Mark list is numbered sequentially starting from 1, independent of Study Order IDs.",
+        "How 2-Mark vs. 5-Mark Badges Were Assigned: Mid 2 questions follow the Short (2 marks) and Long (5 marks) labels printed in the Mid 2 PDF and study order PDF. Original Mid 1 questions follow the Short vs. Long classification in the Mid 1 PDF, and the added Unit I & II Short questions come directly from the attached Unit I–V answer booklet.",
+        "Study Help Separated From Exam Text: Only the \"Answer\" section is written in neutral textbook exam style with zero file names, slide numbers, or hints—so you can study intuitively without accidentally writing \"from Unit 2 PPT\" on your exam script."
       ]
     },
     "part2HowToStudy": {
       "heading": "Part 2 — How to Study Step by Step",
       "routineSteps": [
         "Step 1 — Read \"Understand it\" first: Grasp WHY the concept or rule works in everyday words before touching symbols.",
-        "Step 2 — Read \"Write this in the exam\": Check the structure—clean 3–5 sentences for 2-mark answers, or Idea → Steps → Formula/Diagram → Example → Uses/Limits → Conclusion for 5-mark answers.",
-        "Step 3 — Switch on Practice mode: Scroll to a card, cover or hide the answer, and force your brain to recall the steps without peeking.",
-        "Step 4 — Check gaps & \"Remember these\": Click \"Show answer\", catch any missing formula, sign, or ket, and drill those bullets in \"Remember these\".",
-        "Step 5 — Click \"Mark done\": Only check off a card once you can reproduce its core steps or circuit cleanly from memory."
+        "Step 2 — Read \"Answer\": Check the structure—clean 3–5 sentences for 2-mark answers, or Idea → Steps → Formula/Diagram → Example → Uses/Limits → Conclusion for 5-mark answers.",
+        "Step 3 — Switch on Practice mode: Open a question with Practice mode on, hide the answer, and force your brain to recall the steps without peeking.",
+        "Step 4 — Check gaps & \"Remember\": Click \"Show answer\", catch any missing formula, sign, or ket, and drill the bullet points in \"Remember\".",
+        "Step 5 — Click \"Mark done\": Only check off a question once you can reproduce its core steps or circuit cleanly from memory."
       ],
       "shortVsLong": "Practice 2-mark questions out loud in 30 seconds (definition + 1 key formula or example, no headings needed). For 5-mark questions, never just read passively: jot a 5-point skeleton on rough paper and hand-draw every quantum circuit, matrix multiplication, and Bloch sphere diagram from scratch.",
       "twinQuestionsNote": "Watch out for twin/overlapping questions: Q17 & Q18 both ask about quantum entanglement and Bell states, and Q25 & Q26 both ask to differentiate classical computing from quantum computing. Study each pair deeply once, click Mark done on both after checking any wording nuance, and save 20–30 minutes.",
@@ -67,7 +79,7 @@ window.QST_GUIDE = {
       },
       "studyPlans": [
         {
-          "name": "12-Hour Complete Plan (All 107 Questions)",
+          "name": `12-Hour Complete Plan (All ${TOTAL_Q} Questions)`,
           "summary": "Best when you have a full day before the exam.",
           "blocks": [
             "Hours 1–2.5 · Parts A & B (Stages 1–6): Wave basics, Schrödinger/step potential, Hilbert space, Pauli/H/CNOT calculations (practice matrix multiplications by hand!), Bloch sphere, No-cloning & Teleportation.",
@@ -76,7 +88,7 @@ window.QST_GUIDE = {
             "Break (20 min): Walk/meal, zero cramming.",
             "Hours 6.25–8.5 · Part D (Stages 13–14): BB84 table & 25% QBER math, E91 CHSH inequality, Dense Coding vs Teleportation dual circuits, Repeaters & Channel loss.",
             "Hours 8.75–10.5 · Part E (Stages 15–19): Magnetometry/Gravimetry/Atomic clocks, Ghost imaging & NOON lithography, Quantum Dots/Topological Insulators/NV⁻, Superconducting vs Trapped-Ion vs Photonics, NISQ, NQM & Ethics.",
-            "Hours 10.5–12.0 · Timed Practice-Mode Mock + Next Morning: Filter by Remaining or 5 marks in Practice mode, hand-write 4–5 long answers under a 45-min timer without peeking, get full sleep, then do a 30-min morning skim of \"Remember these\"."
+            "Hours 10.5–12.0 · Timed Practice-Mode Mock + Next Morning: Use Practice mode across your weak 5-mark questions, hand-write 4–5 long answers under a 45-min timer without peeking, get full sleep, then do a 30-min morning skim of \"Remember\" bullets."
           ]
         },
         {
@@ -88,18 +100,18 @@ window.QST_GUIDE = {
             "Break (20 min) between Parts C and D.",
             "Hours 5.25–7.25 · Part D (Stages 13–14): Lock in BB84 worked table (Q50), 25% QBER (Q52), E91 (Q55), Dense coding (Q58), and Repeaters (Q63).",
             "Hours 7.5–9.0 · Part E (Stages 15–19): Learn clear 2-mark definitions first, then Group 5-mark comparisons (Sensors, NV⁻, Hardware platforms table, NQM/Ethics).",
-            "Hours 9.0–10.0 · Timed Recall + Next-Morning Review: Run Practice mode on hardest stages (4, 5, 11, 12, 13), sleep properly, and review \"Remember these\" cards the next morning."
+            "Hours 9.0–10.0 · Timed Recall + Next-Morning Review: Run Practice mode on hardest stages (4, 5, 11, 12, 13), sleep properly, and review \"Remember\" bullets the next morning."
           ]
         },
         {
           "name": "5-Hour Crash Plan (Exam Tomorrow)",
           "summary": "Maximizes marks across all 5 units when time is tight.",
           "blocks": [
-            "Hour 1 · All 53 Two-Mark Questions: Filter by \"2 marks\" across Stages 1–19 in Practice mode—secure fast, exact definitions and formulas first.",
+            `Hour 1 · All ${TWO_M} Two-Mark Questions: Filter by 2-mark questions or open each Unit → 2 Marks in Practice mode—secure fast, exact definitions and formulas first.`,
             "Hours 1.25–2.25 · Core Unit I–II Calculations & Circuits (Stages 3–6): Pauli action on |0⟩/|1⟩, Unitary check U†U=I, H+CNOT Bell states, Teleportation, Step potential.",
             "Hours 2.25–3.5 · Core Unit III & IV 5-Mark Flagships (Stages 9–14): Deutsch–Jozsa, Grover N=4 example, Shor N=15 example, Shor 9-qubit QEC + Qiskit, BB84 + Dense Coding.",
             "Hours 3.5–4.25 · Unit V High-Probability Topics (Stages 15–19): Sensors & NV⁻ centers, Superconducting vs Trapped-Ion vs Photonics, NISQ, National Quantum Mission & Ethics.",
-            "Hours 4.25–5.0 · Timed Writing + Sleep + Morning Refresh: Sketch 3 flagship circuits + tables strictly from memory (no notes), sleep at least 6–7 hours so recall works, and spend 20 minutes next morning scanning \"Remember these\"."
+            "Hours 4.25–5.0 · Timed Writing + Sleep + Morning Refresh: Sketch 3 flagship circuits + tables strictly from memory (no notes), sleep at least 6–7 hours so recall works, and spend 20 minutes next morning scanning \"Remember\" bullets."
           ]
         }
       ]
@@ -108,34 +120,34 @@ window.QST_GUIDE = {
       "heading": "Part 3 — How to Use This App",
       "features": [
         {
-          "name": "Sidebar Navigation (Top to Bottom)",
-          "detail": "At the top of the left menu you will find Start Here (this full study guide) and Sources (exact note mappings and missing diagrams). Below them are Parts A–E holding Stages 1–19 with live completion counters (for example, \"3/4 done\"). On mobile, tap the Menu button at top left."
+          "name": "Focused Page-by-Page Flow",
+          "detail": "Start on Home to choose Study Order (Parts A–E, Stages 1–19) or Unit-wise (Units I–V, then 2 Marks or 5 Marks). Each list shows compact question rows; clicking any row opens a dedicated answer reader with Previous, Next, and Back to list buttons."
         },
         {
-          "name": "Quick Start Banner & \"?\" Help Button",
-          "detail": "The 5-line Quick Start card sits at the top of the Stages view when you open the site (you can dismiss or re-open it anytime). Every page also shows a \"?\" Help button in the top bar for a quick reminder of controls."
+          "name": "Slim Top Bar & Clickable Breadcrumbs",
+          "detail": "Every screen keeps a clean top bar with Home, clickable breadcrumb links (for example, Home › Unit-wise › Unit III › 5 Marks), Search, Practice mode toggle, and the \"?\" Help button."
         },
         {
-          "name": "Search Bar & Filter Chips",
-          "detail": "Type any keyword (\"Grover\", \"BB84\", \"CNOT\", \"Mid 1\", \"Q39\") into the stage search box to match across question titles, exam text, key terms, and sources. Use the filter buttons for All, Remaining, Done, 2 marks, or 5 marks."
+          "name": "Search & Filters",
+          "detail": "Type any keyword (\"Grover\", \"BB84\", \"CNOT\", \"Mid 1\", \"Q39\") into the top Search box or open Search all questions from Home to filter across questions, answers, key terms, marks, Done ticks, and Stars."
         },
         {
-          "name": "Practice Mode",
-          "detail": "Toggle \"Practice mode\" in the top header bar. Every card hides its \"Understand it\", \"Write this in the exam\", \"Remember these\", and \"Source\" blocks until you click \"Show answer\" on that card."
+          "name": "Practice Mode & Diagram Zoom",
+          "detail": "Toggle \"Practice\" in the top bar to hide \"Understand it\", \"Answer\", and \"Remember\" until you click \"Show answer\". Click any diagram to view it full-size in an in-app overlay."
         },
         {
-          "name": "Mark Done & Browser-Only Storage Warning",
-          "detail": "Click \"Mark done\" at the bottom of a card (or top right) to track finished questions across the header progress bar. Important: progress is stored ONLY in this browser via localStorage (key \"qst_exam_done_v1\"). It does not sync across devices, and clearing browser data or site cookies will erase your checkmarks."
+          "name": "Mark Done & Browser-Only Storage",
+          "detail": "Click \"Mark done\" or \"Star\" on any question row or reader page to track progress. Progress is saved ONLY in this browser via localStorage (\"qst_exam_done_v1\" and \"qst_exam_starred_v1\") and never leaves your device."
         },
         {
           "name": "Offline Double-Click Copy",
-          "detail": "The standalone offline-study/index.html file contains the exact same 107 questions, diagrams, Start Here guide, Sources, and Practice mode, and works by double-clicking without internet or servers."
+          "detail": `The standalone offline-study/index.html file contains the exact same ${TOTAL_Q} questions, diagrams, Start Here guide, Sources, and Practice mode, and works by double-clicking without internet or servers.`
         }
       ]
     },
     "part4Sources": {
       "heading": "Part 4 — Where the Answers Came From (Sources)",
-      "overview": "Every answer was built first from your class folder (1unit qst/, 2unit qst/, 3rd unit/, 4 unit qst/, 5 unit qst/), QST_Mid1_Mid2_Study_Order.pdf, and the attached Unit I–V answer booklet. Where your notes were empty, had only an unannotated image, or skipped a syllabus topic (notably QFT.pptx being 0 bytes, deutsch.pptx having no text, and 4 unit qst/ containing only QKD and dense coding), standard textbook derivations (Nielsen & Chuang, Zettili, Ekert 1991) were used and marked as \"Added from textbook\" in each card's Source box.",
+      "overview": "Every answer was built first from your class folder (1unit qst/, 2unit qst/, 3rd unit/, 4 unit qst/, 5 unit qst/), QST_Mid1_Mid2_Study_Order.pdf, and the attached Unit I–V answer booklet. Where your notes were empty, had only an unannotated image, or skipped a syllabus topic (notably QFT.pptx being 0 bytes, deutsch.pptx having no text, and 4 unit qst/ containing only QKD and dense coding), standard textbook derivations (Nielsen & Chuang, Zettili, Ekert 1991) were used and documented in the Sources summary below.",
       "stageSources": [
         {
           "stageId": 1,
@@ -271,7 +283,7 @@ window.QST_GUIDE = {
           "supplementalNotes": "All from Unit V class notes."
         }
       ],
-      "textbookQuestionNumbers": "26 questions include textbook supplements (shown in their Source box): Q1, Q1a, Q22, Q27, Q28, Q29, Q31, Q32, Q33, Q36, Q37, Q43, Q44, Q45, Q52, Q53, Q54, Q55, Q56, Q59, Q60, Q61, Q62, Q63, Q64, Q65.",
+      "textbookQuestionNumbers": `${SUPP_N} questions include textbook supplements: Q1, Q1a, Q22, Q27, Q28, Q29, Q31, Q32, Q33, Q36, Q37, Q43, Q44, Q45, Q52, Q53, Q54, Q55, Q56, Q59, Q60, Q61, Q62, Q63, Q64, Q65.`,
       "disagreements": [
         {
           "topic": "Photoelectric vs. Photovoltaic Effect (Q1)",
@@ -314,7 +326,7 @@ window.QST_GUIDE = {
           "howHandled": "Preserves both ways of stating the figure accurately."
         }
       ],
-      "missingDiagramsSummary": "42 questions include extracted note diagrams or PDF figure crops (including Q13a reusing the Bloch sphere figure), while 65 questions have no separate image file in the notes. Those 65 fall into four exact reasons explained inside each card's Source box:",
+      "missingDiagramsSummary": `${WITH_IMG_N} questions include extracted note diagrams or PDF figure crops (including Q13a reusing the Bloch sphere figure), while ${NO_IMG_N} questions have no separate image file in the notes. Those ${NO_IMG_N} fall into four categories:`,
       "missingDiagramGroups": [
         {
           "category": "1. Pure math derivations, matrices & concise 2-mark definitions (text/equations only)",
@@ -324,7 +336,7 @@ window.QST_GUIDE = {
         {
           "category": "2. Short 2-mark questions sharing a diagram shown on their companion 5-mark card",
           "questions": "Q27 & Q28 (→ Q29), Q30 & Q32 (→ Q33), Q38 (→ Q39), Q41 (→ Q43/Q44), Q47, Q48 & Q51 (→ Q50), Q57 (→ Q58), Q66, Q67, Q69 & Q76 (→ Q77)",
-          "reason": "Keeps 2-mark cards concise while linking straight to the full note diagram in the paired 5-mark question."
+          "reason": "Keeps 2-mark answers concise while pairing the full note diagram with the related 5-mark question."
         },
         {
           "category": "3. Files empty or missing diagrams in your unit notes",
@@ -340,10 +352,10 @@ window.QST_GUIDE = {
     },
     "part5Uncovered": {
       "heading": "Part 5 — What This Site Does NOT Cover",
-      "intro": "Comparing your official course syllabus (0 Quantum Science &Technology syllabus.pdf, Course Code 231EE7O04) and all unit note folders against the 107 exam questions reveals these topics that are in the notes/syllabus but not asked as dedicated questions (plus the .mp4 video 5 unit qst/qkd screen recording.mp4, which was excluded as requested):",
+      "intro": `Comparing your official course syllabus (0 Quantum Science &Technology syllabus.pdf, Course Code 231EE7O04) and all unit note folders against the ${TOTAL_Q} exam questions reveals these topics that are in the notes/syllabus but not asked as dedicated questions (plus the .mp4 video 5 unit qst/qkd screen recording.mp4, which was excluded as requested):`,
       "units": [
         {
-          "unit": "Unit I — Quantum Mechanics Foundations",
+          "unit": "Unit I — Fundamentals of Quantum Mechanics",
           "topicsNotInQuestions": [
             "Blackbody radiation full Planck spectral law derivation beyond the ultraviolet catastrophe (3 black body radiation.docx; UV catastrophe covered in Q1a)",
             "Full relativistic derivation of Compton scattering (5 crompton scattering.docx; Compton wavelength & Δλ formula covered in Q1c)",
@@ -356,7 +368,7 @@ window.QST_GUIDE = {
           ]
         },
         {
-          "unit": "Unit II — Qubits, Hilbert Space & Gates",
+          "unit": "Unit II — Quantum Information Theory",
           "topicsNotInQuestions": [
             "Quantum state tomography (listed in Unit II syllabus, no dedicated question in the question list)",
             "Hermitian operator full eigenvalue/orthogonality proofs & S-gate standalone (7 Hilbert Hermitian hamiltonian.pptx, ex1 problems on hilbert space.docx, good pdf gates.pdf; Hermitian definition covered in Q5a)",
@@ -364,7 +376,7 @@ window.QST_GUIDE = {
           ]
         },
         {
-          "unit": "Unit III — Quantum Algorithms",
+          "unit": "Unit III — Quantum Computing",
           "topicsNotInQuestions": [
             "Generalized multi-target Grover complexity O(√(N/M)) & BBHT unknown-M search (Grovers_Search_Algorithm.pptx s9, Grover.docx)",
             "Shor’s algorithm Qiskit/Python code walk-through (5 shor prg.docx)"
@@ -378,7 +390,7 @@ window.QST_GUIDE = {
           ]
         },
         {
-          "unit": "Unit V — Quantum Technologies & Applications",
+          "unit": "Unit V — Quantum Technologies and Applications",
           "topicsNotInQuestions": [
             "Detailed SQUID magnetometry mechanism (briefly named inside Q68; full detail in Study Guide.pdf p.1 & 5 unit.docx)",
             "Gaussian Boson Sampling (noted in Study Guide.pdf p.3 under Xanadu/supremacy)",
@@ -398,13 +410,13 @@ window.QST_GUIDE = {
     }
   },
   "viewGuide": {
-    "heading": "Using the Two Views: Study Order vs. Unit-wise Exam View",
+    "heading": "Using the Two Browsing Paths: Study Order vs. Unit-wise",
     "lines": [
-      "Use the switch at the very top of every page to flip anytime between Study Order (#study) and Unit-wise Exam View (#units), keeping the exact question you were reading in view.",
-      "Study Order (learn step by step): Use this first to learn topics in the sequence that makes each new idea easy to understand (Parts A–E, Stages 1–19).",
-      "Unit-wise (exam view): Use this for revision and exam practice—arranged by Mid 1 (Units I–II) and Mid 2 (Units III–V), split into 2-Mark and 5-Mark sections, with each section numbered sequentially starting at 1 (independent of Study Order IDs).",
-      "Both views read from one single question store: every question text, answer, formula, diagram, \"Mark done\" tick, and revision Star is identical and shared across both views.",
-      "In Unit-wise Exam View, click \"Study order: #N · Stage X\" or any \"Builds on\" link on a card to jump straight to earlier prerequisites.",
+      "Use the two large cards on Home (or the clickable breadcrumb links in the top bar) to jump between Study Order (#/study) and Unit-wise (#/units), and use browser Back anytime.",
+      "Study Order (learn step by step): Arranged into Parts A–E and Stages 1–19 so each topic prepares you for the next.",
+      "Unit-wise (exam view): Pick Unit I to V, then choose 2 Marks or 5 Marks. Each section is numbered sequentially starting at 1, independent of Study Order IDs.",
+      "Both paths read from one single question store: every question text, answer, formula, diagram, \"Mark done\" tick, and revision Star is identical and shared.",
+      "Inside any question page, click \"Study order: #N · Stage X\" or any \"Builds on\" link to jump straight to earlier prerequisites, then press Back to return.",
       "Check your model paper for the official exam question pattern, internal choice rules, and total marks."
     ]
   },
@@ -419,28 +431,33 @@ window.QST_GUIDE = {
     "unitMetadata": {
       "I": {
         "examTerm": "Mid 1",
-        "title": "Unit I — Foundations of Quantum Mechanics",
-        "subtitle": "Blackbody/photoelectric/Compton foundations, de Broglie waves, Hilbert space, operators, Schrödinger equation & step potential."
+        "syllabusTitle": "Fundamentals of Quantum Mechanics",
+        "title": "Unit I — Fundamentals of Quantum Mechanics",
+        "subtitle": "Early quantum theory, wave and particle duality, Schrödinger equation, potential steps, operators, and uncertainty relations."
       },
       "II": {
         "examTerm": "Mid 1",
-        "title": "Unit II — Qubits, Dirac Notation & Quantum Gates",
-        "subtitle": "Dirac notation, Bloch sphere, superposition, Pauli/T/CNOT gates, tensor products, H+CNOT circuits & no-cloning."
+        "syllabusTitle": "Quantum Information Theory",
+        "title": "Unit II — Quantum Information Theory",
+        "subtitle": "Qubits, Bloch sphere, superposition, Dirac notation, quantum gates, circuits, Bell entanglement, teleportation, and no cloning."
       },
       "III": {
         "examTerm": "Mid 2",
-        "title": "Unit III — Quantum Algorithms & Error Correction",
-        "subtitle": "Classical vs quantum computing, parallelism, Deutsch–Jozsa, Grover, QFT, Shor’s algorithm, QEC codes & Qiskit."
+        "syllabusTitle": "Quantum Computing",
+        "title": "Unit III — Quantum Computing",
+        "subtitle": "Quantum parallelism, Deutsch Jozsa, Grover search, Quantum Fourier Transform, Shor factoring, error correction, and Qiskit."
       },
       "IV": {
         "examTerm": "Mid 2",
-        "title": "Unit IV — Quantum Cryptography & Communication",
-        "subtitle": "BB84 & E91 QKD, eavesdropping, quantum teleportation, dense coding, entanglement swapping, repeaters & hardware loss."
+        "syllabusTitle": "Quantum Communication",
+        "title": "Unit IV — Quantum Communication",
+        "subtitle": "Quantum cryptography, BB84 and E91 key distribution, eavesdropping detection, dense coding, quantum repeaters, and channel noise."
       },
       "V": {
         "examTerm": "Mid 2",
-        "title": "Unit V — Quantum Sensing, Materials, Hardware & Mission",
-        "subtitle": "Quantum sensors, atomic clocks, ghost imaging, topological insulators, NV centers, qubit platforms, NISQ & NQM."
+        "syllabusTitle": "Quantum Technologies and Applications",
+        "title": "Unit V — Quantum Technologies and Applications",
+        "subtitle": "Quantum magnetometers, atomic clocks, ghost imaging, topological materials, NV centers, qubit hardware, NISQ, and national missions."
       }
     },
     "mid1Note": "Each 2-Mark and 5-Mark section is numbered sequentially starting at 1 (independent of Study Order). Original Mid 1 questions (without printed marks in the Mid 1 PDF) appear first, followed by the Unit I & Unit II 2-mark questions added from the attached answer booklet.",
@@ -873,4 +890,5 @@ window.QST_GUIDE = {
       ]
     }
   }
-};
+  };
+})();

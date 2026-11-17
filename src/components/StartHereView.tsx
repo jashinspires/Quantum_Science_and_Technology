@@ -5,19 +5,12 @@ import { ALL_STAGES } from '../data/stages';
 
 interface StartHereViewProps {
   mode: 'guide' | 'sources';
-  onGoToStages: (stageId?: number | 'all') => void;
-  onSwitchMode: (mode: 'guide' | 'sources') => void;
 }
 
-export const StartHereView: React.FC<StartHereViewProps> = ({
-  mode,
-  onGoToStages,
-  onSwitchMode,
-}) => {
+export const StartHereView: React.FC<StartHereViewProps> = ({ mode }) => {
   const [selectedPlanIndex, setSelectedPlanIndex] = useState(0);
 
   const allQuestions = ALL_STAGES.flatMap((s) => s.questions);
-  const totalQuestions = allQuestions.length;
   const supplementCount = allQuestions.filter((q) => q.usesTextbookSupplement).length;
   const noDiagramCount = allQuestions.filter(
     (q) => !q.sections.some((sec) => Boolean(sec.image))
@@ -27,62 +20,56 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
   const activePlan = GUIDE_SECTIONS.part2HowToStudy.studyPlans[selectedPlanIndex];
 
   return (
-    <div className="space-y-5">
-      {/* Header Banner */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => onGoToStages('all')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+    <div className="space-y-6 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <a
+          href="#/"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700 dark:text-sky-300 hover:underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Home</span>
+        </a>
+
+        <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
+          <a
+            href="#/guide"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              mode === 'guide'
+                ? 'bg-white dark:bg-slate-900 text-sky-800 dark:text-sky-300 shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to {totalQuestions} Questions</span>
-          </button>
-
-          <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
-            <button
-              type="button"
-              onClick={() => onSwitchMode('guide')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                mode === 'guide'
-                  ? 'bg-white dark:bg-slate-900 text-sky-800 dark:text-sky-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Start Here Guide</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSwitchMode('sources')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                mode === 'sources'
-                  ? 'bg-white dark:bg-slate-900 text-sky-800 dark:text-sky-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Sources &amp; Coverage</span>
-            </button>
-          </div>
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Start Here Guide</span>
+          </a>
+          <a
+            href="#/sources"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              mode === 'sources'
+                ? 'bg-white dark:bg-slate-900 text-sky-800 dark:text-sky-300 shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Sources &amp; Coverage</span>
+          </a>
         </div>
+      </div>
 
-        <div className="space-y-1.5">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">
-            {isSourcesOnly
-              ? 'Sources, Note Coverage & Diagram Map'
-              : 'Start Here — Complete Study Guide'}
-          </h1>
-          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
-            {isSourcesOnly
-              ? `Exact mapping from your 5 unit folders, the ${supplementCount} textbook supplements, note differences, and uncovered syllabus topics.`
-              : 'Everything you need to know about how this site works, how to study for tomorrow’s QST exam, time plans, sources, and exam-writing rules.'}
-          </p>
-        </div>
+      <header className="space-y-1.5 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">
+          {isSourcesOnly
+            ? 'Sources, Note Coverage & Diagram Map'
+            : 'Start Here — Complete Study Guide'}
+        </h1>
+        <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+          {isSourcesOnly
+            ? `Exact mapping from your 5 unit folders, the ${supplementCount} textbook supplements, note differences, and uncovered syllabus topics.`
+            : 'Everything you need to know about how this site works, how to study for tomorrow’s QST exam, time plans, sources, and exam-writing rules.'}
+        </p>
 
         {!isSourcesOnly && (
-          <div className="flex flex-wrap gap-2 pt-1 text-xs">
+          <div className="flex flex-wrap gap-2 pt-2 text-xs">
             {[
               { id: 'part-views', label: 'Two Views Guide' },
               { id: 'part-1', label: '1. What this site is' },
@@ -95,6 +82,10 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
               <a
                 key={anchor.id}
                 href={`#${anchor.id}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById(anchor.id)?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/60 text-slate-700 dark:text-slate-300 hover:text-sky-800 dark:hover:text-sky-300 font-medium border border-slate-200 dark:border-slate-700 transition-colors"
               >
                 {anchor.label}
@@ -102,11 +93,10 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             ))}
           </div>
         )}
-      </div>
+      </header>
 
       {!isSourcesOnly && (
         <>
-          {/* New Short Section: Study Order vs Unit-wise Exam View */}
           <section
             id="part-views"
             className="bg-sky-50/70 dark:bg-sky-950/35 border border-sky-200 dark:border-sky-800 rounded-xl p-5 sm:p-6 space-y-3"
@@ -114,7 +104,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">
               {VIEW_SWITCH_GUIDE.heading}
             </h2>
-            <ul className="space-y-1.5 text-sm text-slate-800 dark:text-slate-200 list-disc pl-5">
+            <ul className="space-y-1.5 text-sm sm:text-base text-slate-800 dark:text-slate-200 list-disc pl-5">
               {VIEW_SWITCH_GUIDE.lines.map((line, idx) => (
                 <li key={idx} className="leading-relaxed">
                   {line}
@@ -123,7 +113,6 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             </ul>
           </section>
 
-          {/* Part 1 */}
           <section
             id="part-1"
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 space-y-3"
@@ -131,7 +120,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">
               {GUIDE_SECTIONS.part1WhatThisIs.heading}
             </h2>
-            <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 list-disc pl-5">
+            <ul className="space-y-2 text-sm sm:text-base text-slate-700 dark:text-slate-300 list-disc pl-5">
               {GUIDE_SECTIONS.part1WhatThisIs.bullets.map((bullet, idx) => (
                 <li key={idx} className="leading-relaxed">
                   {bullet}
@@ -140,7 +129,6 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             </ul>
           </section>
 
-          {/* Part 2 */}
           <section
             id="part-2"
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 space-y-4"
@@ -153,7 +141,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 5-Step Routine Per Question
               </h3>
-              <ol className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300 list-decimal pl-5">
+              <ol className="space-y-1.5 text-sm sm:text-base text-slate-700 dark:text-slate-300 list-decimal pl-5">
                 {GUIDE_SECTIONS.part2HowToStudy.routineSteps.map((step, i) => (
                   <li key={i} className="leading-relaxed">
                     {step}
@@ -163,13 +151,13 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg p-3.5 text-sm text-slate-700 dark:text-slate-300">
+              <div className="bg-slate-50 dark:bg-slate-800/70 rounded-lg p-3.5 text-sm text-slate-700 dark:text-slate-300">
                 <div className="font-bold text-slate-900 dark:text-slate-100 mb-1">
                   2-Mark vs. 5-Mark Practice
                 </div>
                 <p className="leading-relaxed">{GUIDE_SECTIONS.part2HowToStudy.shortVsLong}</p>
               </div>
-              <div className="bg-sky-50/70 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 rounded-lg p-3.5 text-sm text-slate-800 dark:text-slate-200">
+              <div className="bg-sky-50/70 dark:bg-sky-950/40 rounded-lg p-3.5 text-sm text-slate-800 dark:text-slate-200">
                 <div className="font-bold text-sky-900 dark:text-sky-200 mb-1">
                   Twin Questions Shortcut
                 </div>
@@ -177,11 +165,11 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
               </div>
             </div>
 
-            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-4 space-y-3">
               <div className="font-bold text-sm text-slate-900 dark:text-slate-100">
                 What to Memorize by Heart (Understand WHY First)
               </div>
-              <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-2.5">
+              <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200">
                 <strong>Core Principle:</strong>{' '}
                 {GUIDE_SECTIONS.part2HowToStudy.memorizeMustKnow.understandWhyRule}
               </p>
@@ -211,7 +199,6 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
               </div>
             </div>
 
-            {/* Time Plans */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-slate-100">
@@ -236,7 +223,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-2">
+              <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-4 space-y-2">
                 <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
                   {activePlan.name}
                 </div>
@@ -252,7 +239,6 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             </div>
           </section>
 
-          {/* Part 3 */}
           <section
             id="part-3"
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 space-y-3"
@@ -264,7 +250,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
               {GUIDE_SECTIONS.part3HowToUseApp.features.map((feat) => (
                 <div
                   key={feat.name}
-                  className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg p-3.5 text-sm"
+                  className="bg-slate-50 dark:bg-slate-800/70 rounded-lg p-3.5 text-sm"
                 >
                   <div className="font-bold text-slate-900 dark:text-slate-100 mb-1">
                     {feat.name}
@@ -279,7 +265,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
         </>
       )}
 
-      {/* Part 4 — Sources (shown in both Start Here and dedicated Sources view) */}
+      {/* Part 4 — Sources */}
       <section
         id="part-4"
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 space-y-4"
@@ -287,7 +273,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">
           {GUIDE_SECTIONS.part4Sources.heading}
         </h2>
-        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+        <p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed">
           {GUIDE_SECTIONS.part4Sources.overview}
         </p>
 
@@ -309,13 +295,12 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
               {GUIDE_SECTIONS.part4Sources.stageSources.map((row) => (
                 <tr key={row.stageId}>
                   <td className="font-semibold whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => onGoToStages(row.stageId)}
+                    <a
+                      href={`#/study/stage-${row.stageId}`}
                       className="text-sky-700 dark:text-sky-300 hover:underline text-left"
                     >
                       Stage {row.stageId}: {row.title}
-                    </button>
+                    </a>
                   </td>
                   <td className="whitespace-nowrap font-mono-math text-xs">{row.questionRange}</td>
                   <td className="text-xs">{row.primaryFiles}</td>
@@ -336,7 +321,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             {GUIDE_SECTIONS.part4Sources.disagreements.map((d) => (
               <div
                 key={d.topic}
-                className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-xs sm:text-sm"
+                className="bg-slate-50 dark:bg-slate-800/70 rounded-lg p-3 text-xs sm:text-sm"
               >
                 <div className="font-bold text-slate-900 dark:text-slate-100">{d.topic}</div>
                 <p className="text-slate-700 dark:text-slate-300 mt-1">{d.difference}</p>
@@ -359,7 +344,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             {GUIDE_SECTIONS.part4Sources.missingDiagramGroups.map((g) => (
               <div
                 key={g.category}
-                className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-xs"
+                className="bg-slate-50 dark:bg-slate-800/70 rounded-lg p-3 text-xs"
               >
                 <div className="font-bold text-slate-900 dark:text-slate-100 mb-1">
                   {g.category}
@@ -374,7 +359,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
         </div>
       </section>
 
-      {/* Part 5 — Uncovered Syllabus Topics (shown in both views for transparency) */}
+      {/* Part 5 */}
       <section
         id="part-5"
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 space-y-3"
@@ -392,7 +377,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
           {GUIDE_SECTIONS.part5Uncovered.units.map((u) => (
             <div
               key={u.unit}
-              className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-lg p-3.5"
+              className="bg-slate-50 dark:bg-slate-800/70 rounded-lg p-3.5"
             >
               <div className="font-bold text-sm text-slate-900 dark:text-slate-100 mb-1.5">
                 {u.unit}
@@ -408,7 +393,6 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
       </section>
 
       {!isSourcesOnly && (
-        /* Part 6 — Writing Answers in the Exam */
         <section
           id="part-6"
           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 space-y-3"
@@ -416,7 +400,7 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">
             {GUIDE_SECTIONS.part6ExamWriting.heading}
           </h2>
-          <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300 list-disc pl-5">
+          <ul className="space-y-2 text-sm sm:text-base text-slate-700 dark:text-slate-300 list-disc pl-5">
             {GUIDE_SECTIONS.part6ExamWriting.tips.map((tip, idx) => (
               <li key={idx} className="leading-relaxed">
                 {tip}
@@ -424,14 +408,13 @@ export const StartHereView: React.FC<StartHereViewProps> = ({
             ))}
           </ul>
           <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => onGoToStages(1)}
+            <a
+              href="#/study/stage-1"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-sky-700 text-white text-xs sm:text-sm font-semibold hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500 transition-colors"
             >
               <Layers className="w-4 h-4" />
               <span>Start Studying Stage 1 Now</span>
-            </button>
+            </a>
           </div>
         </section>
       )}

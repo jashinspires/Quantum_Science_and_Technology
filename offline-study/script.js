@@ -1,20 +1,16 @@
 (function () {
   const DONE_KEY = 'qst_exam_done_v1';
   const STAR_KEY = 'qst_exam_starred_v1';
-  const VIEW_KEY = 'qst_view_mode_v1';
   const THEME_KEY = 'qst_theme_v1';
-  const SIDEBAR_KEY = 'qst_sidebar_open_v1';
 
   const stages = (window.QST_STAGES || []).slice().sort((a, b) => a.id - b.id);
   const guide = window.QST_GUIDE || null;
   const examMeta = (guide && guide.examMeta) || {
     unitOrder: ['I', 'II', 'III', 'IV', 'V'],
     unitMetadata: {},
-    mid1Note: "The Mid 1 question bank doesn't print marks. These were decided from the wording of each question.",
     buildsOn: {},
   };
   const UNIT_ORDER = examMeta.unitOrder || ['I', 'II', 'III', 'IV', 'V'];
-  const ALL_UNIT_SECTION_IDS = UNIT_ORDER.flatMap((u) => [`unit-${u}-2`, `unit-${u}-5`]);
 
   function parseIdToken(raw) {
     if (typeof raw === 'number') {
@@ -70,23 +66,6 @@
     } catch {}
   }
 
-  function parseViewHash(hash) {
-    const clean = String(hash || '').trim().toLowerCase();
-    if (clean === '#units' || clean.startsWith('#units/')) return 'units';
-    if (clean === '#study' || clean.startsWith('#study/')) return 'study';
-    return null;
-  }
-
-  function getInitialViewMode() {
-    const fromHash = parseViewHash(window.location.hash);
-    if (fromHash) return fromHash;
-    try {
-      const stored = localStorage.getItem(VIEW_KEY);
-      if (stored === 'units' || stored === 'study') return stored;
-    } catch {}
-    return 'study';
-  }
-
   function getInitialTheme() {
     try {
       const stored = localStorage.getItem(THEME_KEY);
@@ -95,62 +74,19 @@
     return 'light';
   }
 
-  function getInitialSidebarOpen() {
-    try {
-      const stored = localStorage.getItem(SIDEBAR_KEY);
-      if (stored === 'false') return false;
-    } catch {}
-    return true;
-  }
-
-  function getInitialActiveView() {
-    try {
-      if (window.location.hash.trim().toLowerCase() === '#questions') return 'questions';
-    } catch {}
-    return 'stages';
-  }
-
-  let viewMode = getInitialViewMode(); // 'study' | 'units'
-  let theme = getInitialTheme(); // 'light' | 'dark'
-  let desktopSidebarOpen = getInitialSidebarOpen();
-  let activeView = getInitialActiveView(); // 'stages' | 'guide' | 'sources' | 'questions'
-  let selectedStageId = 'all';
-  let selectedUnitCode = 'all';
-  let marksFilter = 'all';
-  let searchQuery = '';
-  let onlyPending = false;
-  let onlyStarred = false;
-  let aqScope = 'both'; // 'both' | 'study' | 'units'
-  let aqSearch = '';
-  let aqMarks = 'all'; // 'all' | '2' | '5'
-  let aqOnlyPending = false;
-  let aqOnlyStarred = false;
-  let aqShellBuilt = false;
+  let theme = getInitialTheme();
   let practiceMode = false;
-  let selectedPlanIdx = 0;
-  let expandedStages = new Set([1]);
-  let expandedSectionIds = new Set(ALL_UNIT_SECTION_IDS);
-  let collapsedExamCards = new Set();
   let revealedQuestions = new Set();
   let doneSet = new Set(loadIdList(DONE_KEY));
   let starredSet = new Set(loadIdList(STAR_KEY));
+  let selectedPlanIdx = 0;
+  let confirmingReset = false;
 
-  function applyDesktopSidebar(open) {
-    desktopSidebarOpen = Boolean(open);
-    const layout = document.getElementById('top');
-    const toggleBtn = document.getElementById('desktop-sidebar-toggle-btn');
-    if (layout) layout.classList.toggle('sidebar-collapsed', !desktopSidebarOpen);
-    if (toggleBtn) {
-      toggleBtn.setAttribute('aria-expanded', String(desktopSidebarOpen));
-      toggleBtn.setAttribute('aria-label', desktopSidebarOpen ? 'Hide left sidebar' : 'Show left sidebar');
-      toggleBtn.textContent = desktopSidebarOpen ? '☰ Hide menu' : '☰ Show menu';
-      toggleBtn.classList.toggle('btn-primary', !desktopSidebarOpen);
-      toggleBtn.classList.toggle('btn-outline', desktopSidebarOpen);
-    }
-    try {
-      localStorage.setItem(SIDEBAR_KEY, String(desktopSidebarOpen));
-    } catch {}
-  }
+  // All/Search filter state
+  let aqSearchInput = '';
+  let aqMarksFilter = 'all';
+  let aqOnlyPending = false;
+  let aqOnlyStarred = false;
 
   function applyTheme(nextTheme) {
     theme = nextTheme;
@@ -162,28 +98,9 @@
     try {
       localStorage.setItem(THEME_KEY, theme);
     } catch {}
-    const btn = document.getElementById('theme-toggle-btn');
-    const icon = document.getElementById('theme-toggle-icon');
-    const lbl = document.getElementById('theme-toggle-label');
-    if (btn) {
-      btn.setAttribute('aria-pressed', String(theme === 'dark'));
-      btn.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-    }
-    if (icon) icon.textContent = theme === 'dark' ? '☀️' : '🌙';
-    if (lbl) lbl.textContent = theme === 'dark' ? 'Light' : 'Dark';
-  }
-
-  function syncViewModeUrlAndStorage() {
-    try {
-      localStorage.setItem(VIEW_KEY, viewMode);
-    } catch {}
-    const targetHash = activeView === 'questions' ? '#questions' : (viewMode === 'units' ? '#units' : '#study');
-    if (window.location.hash.trim().toLowerCase() !== targetHash) {
-      try {
-        window.history.replaceState(null, '', targetHash);
-      } catch {
-        window.location.hash = targetHash;
-      }
+    const modalBtn = document.getElementById('modal-theme-btn');
+    if (modalBtn) {
+      modalBtn.textContent = theme === 'dark' ? 'Light theme' : 'Dark theme';
     }
   }
 
@@ -193,7 +110,10 @@
 
   function escapeHtml(s) {
     return String(s || '')
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   function parseSourceTag(sourceTag) {
@@ -232,12 +152,28 @@
     if (examTerm === 'Mid 1') {
       const qMatch = tail.match(/^Q(\d+)$/);
       const bankNumber = qMatch ? Number(qMatch[1]) : 999;
-      return { examTerm, unitCode, kind: 'mid1', bankNumber, bankLabel: tail, bankDisplayPrefix: String(bankNumber), bankSortKey: bankNumber * 10 };
+      return {
+        examTerm,
+        unitCode,
+        kind: 'mid1',
+        bankNumber,
+        bankLabel: tail,
+        bankDisplayPrefix: String(bankNumber),
+        bankSortKey: bankNumber * 10,
+      };
     }
     const shortMatch = tail.match(/^Short Q(\d+)$/);
     if (shortMatch) {
       const bankNumber = Number(shortMatch[1]);
-      return { examTerm, unitCode, kind: 'short', bankNumber, bankLabel: tail, bankDisplayPrefix: String(bankNumber), bankSortKey: bankNumber * 10 };
+      return {
+        examTerm,
+        unitCode,
+        kind: 'short',
+        bankNumber,
+        bankLabel: tail,
+        bankDisplayPrefix: String(bankNumber),
+        bankSortKey: bankNumber * 10,
+      };
     }
     const longMatch = tail.match(/^Long Q(\d+)\(([ab])\)$/);
     if (longMatch) {
@@ -254,7 +190,15 @@
         bankSortKey: 1000 + bankNumber * 10 + (subLetter === 'a' ? 1 : 2),
       };
     }
-    return { examTerm, unitCode, kind: 'short', bankNumber: 999, bankLabel: tail, bankDisplayPrefix: tail, bankSortKey: 9999 };
+    return {
+      examTerm,
+      unitCode,
+      kind: 'short',
+      bankNumber: 999,
+      bankLabel: tail,
+      bankDisplayPrefix: tail,
+      bankSortKey: 9999,
+    };
   }
 
   function computeSectionPrefixMap() {
@@ -272,7 +216,9 @@
       list.sort((a, b) => a.parsed.bankSortKey - b.parsed.bankSortKey);
       const hasLong = list.some((item) => item.parsed.kind === 'long');
       if (hasLong) {
-        const groupNums = Array.from(new Set(list.filter((i) => i.parsed.kind === 'long').map((i) => i.parsed.bankNumber))).sort((a, b) => a - b);
+        const groupNums = Array.from(
+          new Set(list.filter((i) => i.parsed.kind === 'long').map((i) => i.parsed.bankNumber))
+        ).sort((a, b) => a - b);
         const groupSeq = new Map();
         groupNums.forEach((g, idx) => groupSeq.set(g, idx + 1));
         let nonLongIdx = 0;
@@ -295,7 +241,10 @@
   }
 
   const sectionPrefixMap = computeSectionPrefixMap();
-  const totalQuestionCount = stages.reduce((acc, s) => acc + s.questions.length, 0);
+  const allQuestions = stages.flatMap((s) => s.questions);
+  const totalQuestionCount = allQuestions.length;
+  const twoMarkCount = allQuestions.filter((q) => q.marks === 2).length;
+  const fiveMarkCount = allQuestions.filter((q) => q.marks === 5).length;
 
   const locationMap = new Map();
   for (const stage of stages) {
@@ -316,21 +265,28 @@
     }
   }
 
-  function matchesQuestion(q) {
-    if (marksFilter !== 'all' && q.marks !== Number(marksFilter)) return false;
-    if (onlyPending && doneSet.has(q.number)) return false;
-    if (onlyStarred && !starredSet.has(q.number)) return false;
-    const raw = searchQuery.trim().toLowerCase();
+  function matchesCriteria(q, query, mFilter, pendingOnly, starredOnly) {
+    if (mFilter !== 'all' && q.marks !== Number(mFilter)) return false;
+    if (pendingOnly && doneSet.has(q.number)) return false;
+    if (starredOnly && !starredSet.has(q.number)) return false;
+    const raw = String(query || '').trim().toLowerCase();
     if (!raw) return true;
     const haystack = [
-      String(q.number), 'q' + q.number, q.question, q.sourceTag, q.intuition, q.studySource || '',
+      String(q.number),
+      'q' + q.number,
+      q.question,
+      q.sourceTag,
+      q.intuition,
+      q.studySource || '',
       (q.rememberThese || []).join(' '),
       (q.sections || []).map((s) => (s.label || '') + ' ' + stripHtml(s.html)).join(' '),
-    ].join(' ').toLowerCase();
+    ]
+      .join(' ')
+      .toLowerCase();
     return raw.split(/\s+/).filter(Boolean).every((t) => haystack.includes(t));
   }
 
-  function buildUnitGroups(ignoreFilters) {
+  function buildUnitGroups(query, mFilter, pendingOnly, starredOnly) {
     const byUnit = new Map();
     UNIT_ORDER.forEach((u) => byUnit.set(u, []));
 
@@ -353,7 +309,9 @@
 
     const buildSection = (unitCode, marks, allItems, filteredItems) => {
       const shortTitle = marks === 2 ? '2-Mark Questions' : '5-Mark Questions';
-      const sorted = filteredItems.slice().sort((a, b) => a.parsedTag.bankSortKey - b.parsedTag.bankSortKey);
+      const sorted = filteredItems
+        .slice()
+        .sort((a, b) => a.parsedTag.bankSortKey - b.parsedTag.bankSortKey);
       const longGroupsMap = new Map();
       const ungroupedItems = [];
       for (const item of sorted) {
@@ -385,308 +343,907 @@
       };
     };
 
-    const hasActiveFilter = !ignoreFilters && (
-      searchQuery.trim().length > 0 || marksFilter !== 'all' || onlyPending || onlyStarred
-    );
+    const hasFilter =
+      String(query || '').trim().length > 0 || mFilter !== 'all' || pendingOnly || starredOnly;
 
-    const buildUnitObj = (unitCode) => {
-      if (!ignoreFilters && selectedUnitCode !== 'all' && selectedUnitCode !== unitCode) return null;
+    return UNIT_ORDER.map((unitCode) => {
       const allInUnit = byUnit.get(unitCode) || [];
       const totalQuestions = allInUnit.length;
       const doneQuestions = allInUnit.filter((i) => doneSet.has(i.question.number)).length;
       const percentDone = totalQuestions ? Math.round((doneQuestions / totalQuestions) * 100) : 0;
-      const matching = ignoreFilters ? allInUnit : allInUnit.filter((i) => matchesQuestion(i.question));
-      if (hasActiveFilter && !matching.length) return null;
+      const matching = hasFilter
+        ? allInUnit.filter((i) => matchesCriteria(i.question, query, mFilter, pendingOnly, starredOnly))
+        : allInUnit;
 
       const meta = (examMeta.unitMetadata && examMeta.unitMetadata[unitCode]) || {
         examTerm: unitCode === 'I' || unitCode === 'II' ? 'Mid 1' : 'Mid 2',
+        syllabusTitle: `Unit ${unitCode}`,
         title: `Unit ${unitCode}`,
         subtitle: '',
       };
+
       return {
         unitCode,
         examTerm: meta.examTerm,
+        syllabusTitle: meta.syllabusTitle || meta.title,
         title: meta.title,
         subtitle: meta.subtitle,
         totalQuestions,
         doneQuestions,
         percentDone,
-        twoMarkSection: buildSection(unitCode, 2, allInUnit.filter((i) => i.question.marks === 2), matching.filter((i) => i.question.marks === 2)),
-        fiveMarkSection: buildSection(unitCode, 5, allInUnit.filter((i) => i.question.marks === 5), matching.filter((i) => i.question.marks === 5)),
+        twoMarkSection: buildSection(
+          unitCode,
+          2,
+          allInUnit.filter((i) => i.question.marks === 2),
+          matching.filter((i) => i.question.marks === 2)
+        ),
+        fiveMarkSection: buildSection(
+          unitCode,
+          5,
+          allInUnit.filter((i) => i.question.marks === 5),
+          matching.filter((i) => i.question.marks === 5)
+        ),
       };
-    };
-
-    const mid1Units = ['I', 'II'].map(buildUnitObj).filter(Boolean);
-    const mid2Units = ['III', 'IV', 'V'].map(buildUnitObj).filter(Boolean);
-    const terms = [];
-    if (mid1Units.length) {
-      terms.push({
-        examTerm: 'Mid 1',
-        title: 'Mid 1 (Units I & II)',
-        note: examMeta.mid1Note,
-        units: mid1Units,
-      });
-    }
-    if (mid2Units.length) {
-      terms.push({
-        examTerm: 'Mid 2',
-        title: 'Mid 2 (Units III, IV & V)',
-        units: mid2Units,
-      });
-    }
-    return terms;
+    });
   }
 
-  function findCurrentReadingQuestionNumber() {
-    const cards = Array.from(document.querySelectorAll('[data-question-number]'));
-    if (!cards.length) return null;
-    const anchorY = 140;
-    let bestCard = null;
-    let bestScore = Infinity;
-    for (const el of cards) {
-      const rect = el.getBoundingClientRect();
-      if (rect.height === 0) continue;
-      if (rect.top <= anchorY && rect.bottom >= anchorY) {
-        return parseIdToken(el.getAttribute('data-question-number'));
+  function normalizeUnitCode(raw) {
+    const u = String(raw || '').trim().toUpperCase();
+    return UNIT_ORDER.includes(u) ? u : null;
+  }
+
+  function parseRoute(hash) {
+    const raw = String(hash || '').trim();
+    if (!raw || raw === '#' || raw === '#/') return { page: 'home' };
+    const lower = raw.toLowerCase();
+    if (lower === '#study') return { page: 'study-stages' };
+    if (lower === '#units') return { page: 'units-list' };
+    if (lower === '#questions') return { page: 'all', scope: 'both' };
+
+    const withoutHash = raw.startsWith('#') ? raw.slice(1) : raw;
+    const [pathPart, queryPart = ''] = withoutHash.split('?');
+    const segments = pathPart.split('/').filter(Boolean);
+    if (!segments.length) return { page: 'home' };
+
+    const head = segments[0].toLowerCase();
+    if (head === 'guide') return { page: 'guide' };
+    if (head === 'sources') return { page: 'sources' };
+
+    if (head === 'study') {
+      if (segments.length === 1) return { page: 'study-stages' };
+      const sm = segments[1].match(/^stage-(\d+)$/i);
+      const stageId = sm ? Number(sm[1]) : NaN;
+      if (!Number.isInteger(stageId) || stageId < 1) return { page: 'study-stages' };
+      if (segments.length >= 4 && segments[2].toLowerCase() === 'q') {
+        const qNum = parseIdToken(decodeURIComponent(segments[3]));
+        if (qNum !== null) return { page: 'study-question', stageId, questionNumber: qNum };
       }
-      const dist = Math.abs(rect.top - anchorY);
-      if (rect.bottom > 60 && dist < bestScore) {
-        bestScore = dist;
-        bestCard = el;
+      return { page: 'study-stage', stageId };
+    }
+
+    if (head === 'units') {
+      if (segments.length === 1) return { page: 'units-list' };
+      const unitCode = normalizeUnitCode(segments[1]);
+      if (!unitCode) return { page: 'units-list' };
+      if (segments.length === 2) return { page: 'unit-marks', unitCode };
+      const marks = segments[2] === '2' ? 2 : segments[2] === '5' ? 5 : null;
+      if (!marks) return { page: 'unit-marks', unitCode };
+      if (segments.length >= 5 && segments[3].toLowerCase() === 'q') {
+        const qNum = parseIdToken(decodeURIComponent(segments[4]));
+        if (qNum !== null) return { page: 'unit-question', unitCode, marks, questionNumber: qNum };
       }
+      return { page: 'unit-questions', unitCode, marks };
     }
-    if (!bestCard) return null;
-    return parseIdToken(bestCard.getAttribute('data-question-number'));
+
+    if (head === 'all') {
+      const params = new URLSearchParams(queryPart);
+      const sp = params.get('scope');
+      const scope = sp === 'study' || sp === 'units' ? sp : 'both';
+      if (segments.length >= 3 && segments[1].toLowerCase() === 'q') {
+        const qNum = parseIdToken(decodeURIComponent(segments[2]));
+        if (qNum !== null) return { page: 'all-question', scope, questionNumber: qNum };
+      }
+      return { page: 'all', scope };
+    }
+
+    if (head === 'search') {
+      const params = new URLSearchParams(queryPart);
+      const query = params.get('q') || '';
+      if (segments.length >= 3 && segments[1].toLowerCase() === 'q') {
+        const qNum = parseIdToken(decodeURIComponent(segments[2]));
+        if (qNum !== null) return { page: 'search-question', query, questionNumber: qNum };
+      }
+      return { page: 'search', query };
+    }
+
+    return { page: 'home' };
   }
 
-  function ensureQuestionVisibleInView(qNum, targetMode) {
-    const loc = locationMap.get(qNum);
-    if (!loc) return;
-    if (targetMode === 'study') {
-      if (selectedStageId !== 'all' && selectedStageId !== loc.stageId) selectedStageId = 'all';
-      expandedStages.add(loc.stageId);
-    } else {
-      if (selectedUnitCode !== 'all' && selectedUnitCode !== loc.unitCode) selectedUnitCode = 'all';
-      expandedSectionIds.add(`unit-${loc.unitCode}-${loc.marks}`);
-      collapsedExamCards.delete(qNum);
+  function formatRoute(r) {
+    switch (r.page) {
+      case 'home': return '#/';
+      case 'study-stages': return '#/study';
+      case 'study-stage': return `#/study/stage-${r.stageId}`;
+      case 'study-question': return `#/study/stage-${r.stageId}/q/${encodeURIComponent(String(r.questionNumber))}`;
+      case 'units-list': return '#/units';
+      case 'unit-marks': return `#/units/${r.unitCode}`;
+      case 'unit-questions': return `#/units/${r.unitCode}/${r.marks}`;
+      case 'unit-question': return `#/units/${r.unitCode}/${r.marks}/q/${encodeURIComponent(String(r.questionNumber))}`;
+      case 'all': return r.scope && r.scope !== 'both' ? `#/all?scope=${r.scope}` : '#/all';
+      case 'all-question': {
+        const b = `#/all/q/${encodeURIComponent(String(r.questionNumber))}`;
+        return r.scope && r.scope !== 'both' ? `${b}?scope=${r.scope}` : b;
+      }
+      case 'search': return r.query && r.query.trim() ? `#/search?q=${encodeURIComponent(r.query.trim())}` : '#/search';
+      case 'search-question': {
+        const b = `#/search/q/${encodeURIComponent(String(r.questionNumber))}`;
+        return r.query && r.query.trim() ? `${b}?q=${encodeURIComponent(r.query.trim())}` : b;
+      }
+      case 'guide': return '#/guide';
+      case 'sources': return '#/sources';
     }
+    return '#/';
   }
 
-  function scrollToQuestionElement(qNum) {
-    setTimeout(() => {
-      const el = document.getElementById(`q-${qNum}`);
-      if (el) el.scrollIntoView({ behavior: 'instant', block: 'start' });
-    }, 60);
+  function getBreadcrumbs(r) {
+    const items = [{ label: 'Home', hash: '#/', current: r.page === 'home' }];
+    if (r.page === 'home') return items;
+    items[0].current = false;
+
+    if (r.page === 'study-stages') {
+      items.push({ label: 'Study Order', hash: '#/study', current: true });
+    } else if (r.page === 'study-stage') {
+      items.push({ label: 'Study Order', hash: '#/study', current: false });
+      items.push({ label: `Stage ${r.stageId}`, hash: formatRoute(r), current: true });
+    } else if (r.page === 'study-question') {
+      items.push({ label: 'Study Order', hash: '#/study', current: false });
+      items.push({ label: `Stage ${r.stageId}`, hash: `#/study/stage-${r.stageId}`, current: false });
+      items.push({ label: `Q${r.questionNumber}`, hash: formatRoute(r), current: true });
+    } else if (r.page === 'units-list') {
+      items.push({ label: 'Unit-wise', hash: '#/units', current: true });
+    } else if (r.page === 'unit-marks') {
+      items.push({ label: 'Unit-wise', hash: '#/units', current: false });
+      items.push({ label: `Unit ${r.unitCode}`, hash: formatRoute(r), current: true });
+    } else if (r.page === 'unit-questions') {
+      items.push({ label: 'Unit-wise', hash: '#/units', current: false });
+      items.push({ label: `Unit ${r.unitCode}`, hash: `#/units/${r.unitCode}`, current: false });
+      items.push({ label: `${r.marks} Marks`, hash: formatRoute(r), current: true });
+    } else if (r.page === 'unit-question') {
+      const loc = locationMap.get(r.questionNumber);
+      const lbl = loc ? `#${loc.sectionNumberPrefix}` : `Q${r.questionNumber}`;
+      items.push({ label: 'Unit-wise', hash: '#/units', current: false });
+      items.push({ label: `Unit ${r.unitCode}`, hash: `#/units/${r.unitCode}`, current: false });
+      items.push({ label: `${r.marks} Marks`, hash: `#/units/${r.unitCode}/${r.marks}`, current: false });
+      items.push({ label: lbl, hash: formatRoute(r), current: true });
+    } else if (r.page === 'all') {
+      items.push({ label: 'All Questions', hash: formatRoute(r), current: true });
+    } else if (r.page === 'all-question') {
+      items.push({ label: 'All Questions', hash: formatRoute({ page: 'all', scope: r.scope }), current: false });
+      items.push({ label: `Q${r.questionNumber}`, hash: formatRoute(r), current: true });
+    } else if (r.page === 'search') {
+      items.push({ label: 'Search', hash: formatRoute(r), current: true });
+    } else if (r.page === 'search-question') {
+      items.push({ label: 'Search', hash: formatRoute({ page: 'search', query: r.query }), current: false });
+      items.push({ label: `Q${r.questionNumber}`, hash: formatRoute(r), current: true });
+    } else if (r.page === 'guide') {
+      items.push({ label: 'Start Here', hash: '#/guide', current: true });
+    } else if (r.page === 'sources') {
+      items.push({ label: 'Sources', hash: '#/sources', current: true });
+    }
+    return items;
   }
 
-  function renderQuickStartAndHelp() {
-    if (!guide) return;
-    const qsList = document.getElementById('quick-start-list');
-    if (qsList) {
-      qsList.innerHTML = (guide.quickStartLines || []).map((line) => `<li>${escapeHtml(line)}</li>`).join('');
-    }
-    const helpBody = document.getElementById('help-modal-body');
-    if (helpBody) {
-      helpBody.innerHTML = (guide.helpItems || [])
-        .map((item) => `<div class="modal-item"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.body)}</span></div>`)
-        .join('');
-    }
-  }
-
-  function renderHeaderAndViewSwitch() {
-    const studyBtn = document.getElementById('switch-study-btn');
-    const unitsBtn = document.getElementById('switch-units-btn');
-    const allQBtn = document.getElementById('open-all-questions-btn');
-    const isStudyActive = viewMode === 'study' && activeView === 'stages';
-    const isUnitsActive = viewMode === 'units' && activeView === 'stages';
-    const isQuestionsActive = activeView === 'questions';
-    if (studyBtn) {
-      studyBtn.classList.toggle('active', isStudyActive);
-      studyBtn.setAttribute('aria-pressed', String(isStudyActive));
-    }
-    if (unitsBtn) {
-      unitsBtn.classList.toggle('active', isUnitsActive);
-      unitsBtn.setAttribute('aria-pressed', String(isUnitsActive));
-    }
-    if (allQBtn) {
-      allQBtn.textContent = `All Questions (${totalQuestionCount})`;
-      allQBtn.setAttribute('aria-pressed', String(isQuestionsActive));
-      allQBtn.classList.toggle('btn-primary', isQuestionsActive);
-      allQBtn.classList.toggle('btn-outline', !isQuestionsActive);
-    }
-
-    const nav = document.getElementById('header-quick-nav');
+  function renderTopBar(r) {
+    const bc = getBreadcrumbs(r);
+    const nav = document.getElementById('topbar-breadcrumbs');
     if (nav) {
-      if (viewMode === 'units') {
-        nav.innerHTML = UNIT_ORDER.map((u) => `<a href="#unit-${u}" data-jump-unit="${u}">Unit ${u}</a>`).join('');
-        nav.querySelectorAll('[data-jump-unit]').forEach((a) => {
-          a.addEventListener('click', (e) => {
-            e.preventDefault();
-            const unitCode = a.getAttribute('data-jump-unit');
-            activeView = 'stages';
-            viewMode = 'units';
-            selectedUnitCode = 'all';
-            expandedSectionIds.add(`unit-${unitCode}-2`);
-            expandedSectionIds.add(`unit-${unitCode}-5`);
-            syncViewModeUrlAndStorage();
-            renderAll();
-            setTimeout(() => document.getElementById(`unit-${unitCode}`)?.scrollIntoView({ behavior: 'smooth' }), 40);
-          });
-        });
+      if (bc.length <= 1) {
+        nav.innerHTML = '';
       } else {
-        const parts = [
-          { label: 'Part A', stageId: 1 },
-          { label: 'Part B', stageId: 4 },
-          { label: 'Part C', stageId: 7 },
-          { label: 'Part D', stageId: 13 },
-          { label: 'Part E', stageId: 15 },
-        ];
-        nav.innerHTML = parts.map((p) => `<a href="#stage-${p.stageId}" data-jump-stage="${p.stageId}">${p.label}</a>`).join('');
-        nav.querySelectorAll('[data-jump-stage]').forEach((a) => {
-          a.addEventListener('click', (e) => {
-            e.preventDefault();
-            const targetId = Number(a.getAttribute('data-jump-stage'));
-            activeView = 'stages';
-            viewMode = 'study';
-            selectedStageId = 'all';
-            expandedStages.add(targetId);
-            syncViewModeUrlAndStorage();
-            renderAll();
-            setTimeout(() => document.getElementById(`stage-${targetId}`)?.scrollIntoView({ behavior: 'smooth' }), 40);
-          });
-        });
+        nav.innerHTML = bc
+          .slice(1)
+          .map((c) => {
+            const node = c.current
+              ? `<span class="breadcrumb-current" aria-current="page">${escapeHtml(c.label)}</span>`
+              : `<a href="${c.hash}">${escapeHtml(c.label)}</a>`;
+            return `<span class="breadcrumb-sep" aria-hidden="true">›</span>${node}`;
+          })
+          .join('');
       }
     }
 
-    const hintEl = document.getElementById('view-switcher-hint');
-    if (hintEl) {
-      hintEl.textContent = `Same ${totalQuestionCount} questions & answers · shared ticks & stars`;
+    const pracBtn = document.getElementById('practice-toggle-btn');
+    if (pracBtn) {
+      pracBtn.setAttribute('aria-pressed', String(practiceMode));
+      pracBtn.textContent = practiceMode ? 'Practice: On' : 'Practice';
     }
 
-    const introSub = document.getElementById('intro-subtitle');
-    if (introSub) {
-      introSub.textContent = viewMode === 'units'
-        ? `Unit-wise Exam View organized by Mid 1 (Units I–II) and Mid 2 (Units III–V), split into 2-mark and 5-mark sections with independent sequential numbering (1, 2, 3...) across all ${totalQuestionCount} questions.`
-        : `Study Order View covering all ${totalQuestionCount} exam-ready answers across ${stages.length} progressive stages (Parts A–E), with intuition, clean answer sheets, key formulas, and transparent study sources.`;
-    }
-
-    const sidebarTitle = document.getElementById('sidebar-mobile-title');
-    if (sidebarTitle) {
-      sidebarTitle.textContent = viewMode === 'units' ? 'Menu & Exam Units' : 'Menu & Study Stages';
+    const searchEl = document.getElementById('topbar-search-input');
+    if (searchEl && (r.page === 'search' || r.page === 'search-question')) {
+      if (searchEl.value !== r.query) searchEl.value = r.query;
     }
   }
 
-  function renderSidebar() {
-    const container = document.getElementById('sidebar-content');
-    if (!container) return;
+  function renderQuestionRowHtml(q, prefix, metaLabel, targetHash, showSourceTag) {
+    const isDone = doneSet.has(q.number);
+    const isStarred = starredSet.has(q.number);
+    return `<div class="q-row ${isDone ? 'done' : ''}" data-question-number="${q.number}">
+      <a href="${targetHash}" class="q-row-link">
+        <span class="q-row-prefix">${escapeHtml(prefix)}</span>
+        <div style="min-width:0;flex:1;">
+          <div class="q-row-title">${escapeHtml(q.question)}</div>
+          ${q.questionMathHtml || ''}
+          ${(metaLabel || showSourceTag)
+            ? `<div class="q-row-meta">${metaLabel ? escapeHtml(metaLabel) : ''}${metaLabel && showSourceTag ? ' · ' : ''}${showSourceTag ? escapeHtml(q.sourceTag) : ''}</div>`
+            : ''}
+        </div>
+      </a>
+      <div class="q-row-actions">
+        <span class="marks-tag ${q.marks === 5 ? 'five' : ''}">${q.marks}M</span>
+        <button type="button" class="btn btn-star" data-star="${q.number}" aria-pressed="${isStarred}" aria-label="Star question ${q.number}">${isStarred ? '★' : '☆'}</button>
+        <button type="button" class="btn btn-done" data-done="${q.number}" aria-pressed="${isDone}" aria-label="Mark question ${q.number} as done">${isDone ? '✓ Done' : 'Done'}</button>
+      </div>
+    </div>`;
+  }
 
-    let html = `<div class="sidebar-top-group">
-      <button type="button" class="sidebar-btn ${activeView === 'guide' ? 'solid-active' : 'guide-btn'}" data-view="guide">
-        <span>Start Here</span>
-      </button>
-      <button type="button" class="sidebar-btn ${activeView === 'sources' ? 'solid-active' : ''}" data-view="sources">
-        <span>Sources &amp; Coverage</span>
-      </button>
-      <button type="button" class="sidebar-btn ${activeView === 'questions' ? 'solid-active' : ''}" data-view="questions">
-        <span>All Questions</span>
-        <span class="sidebar-count">${totalQuestionCount}</span>
-      </button>
+  function renderHomeHtml() {
+    const pct = totalQuestionCount ? Math.round((doneSet.size / totalQuestionCount) * 100) : 0;
+    const resetBlock = !confirmingReset
+      ? `<button type="button" id="home-reset-btn" class="btn btn-outline">Reset progress</button>`
+      : `<span style="display:inline-flex;align-items:center;gap:8px;font-size:0.85rem;">
+          <strong>Clear all ticks?</strong>
+          <button type="button" id="home-reset-confirm" class="btn btn-outline" style="color:#b91c1c;">Yes, reset</button>
+          <button type="button" id="home-reset-cancel" class="btn btn-outline">Cancel</button>
+        </span>`;
+
+    return `<div class="stack-lg">
+      <section class="stack-sm">
+        <div class="page-head" style="border-bottom:none;padding-bottom:0;">
+          <h1>Quantum Science &amp; Technology</h1>
+          <p>Complete exam study companion covering all ${totalQuestionCount} questions across ${stages.length} stages and ${UNIT_ORDER.length} syllabus units.</p>
+        </div>
+        <div class="progress-panel">
+          <div class="progress-row">
+            <strong>Overall progress: ${doneSet.size} / ${totalQuestionCount} done (${pct}%)</strong>
+            <span style="font-size:0.88rem;color:var(--ink-muted);">${twoMarkCount} two-mark · ${fiveMarkCount} five-mark · ${starredSet.size} starred</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+            <div class="progress-fill" style="width:${pct}%"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="choice-grid-2" aria-label="Choose how to browse">
+        <a href="#/study" class="choice-card">
+          <div class="stack-sm">
+            <h2>Study Order</h2>
+            <p>Learn step by step. Each topic prepares you for the next.</p>
+          </div>
+          <div class="choice-card-foot">
+            <span>${stages.length} stages (Parts A–E) · ${totalQuestionCount} questions</span>
+            <span>Open →</span>
+          </div>
+        </a>
+
+        <a href="#/units" class="choice-card">
+          <div class="stack-sm">
+            <h2>Unit-wise</h2>
+            <p>Exam view. Pick a unit, then 2-mark or 5-mark questions.</p>
+          </div>
+          <div class="choice-card-foot">
+            <span>Units I–V (Mid 1 &amp; Mid 2) · ${totalQuestionCount} questions</span>
+            <span>Open →</span>
+          </div>
+        </a>
+      </section>
+
+      <section class="home-secondary-row">
+        <div class="home-secondary-links">
+          <a href="#/all" class="text-link">Search all questions</a>
+          <a href="#/guide" class="text-link" style="color:var(--ink-muted);">Start Here guide</a>
+          <a href="#/sources" class="text-link" style="color:var(--ink-muted);">Sources</a>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+          <button type="button" id="home-theme-btn" class="btn btn-outline">${theme === 'dark' ? 'Light theme' : 'Dark theme'}</button>
+          ${resetBlock}
+        </div>
+      </section>
+    </div>`;
+  }
+
+  function renderStudyStagesHtml() {
+    const parts = ['A', 'B', 'C', 'D', 'E'];
+    const sectionsHtml = parts
+      .map((part) => {
+        const list = stages.filter((s) => s.part === part);
+        if (!list.length) return '';
+        const cards = list
+          .map((s) => {
+            const sDone = s.questions.filter((q) => doneSet.has(q.number)).length;
+            const sTotal = s.questions.length;
+            const pct = sTotal ? Math.round((sDone / sTotal) * 100) : 0;
+            return `<a href="#/study/stage-${s.id}" class="choice-card" style="padding:20px;gap:14px;">
+              <div class="stack-sm" style="gap:6px;">
+                <div class="progress-row" style="font-size:0.78rem;">
+                  <span style="color:var(--accent-ink);font-weight:700;">Stage ${s.id}</span>
+                  <span style="color:var(--ink-subtle);">${sDone} / ${sTotal} done</span>
+                </div>
+                <h3 style="font-size:1.1rem;">${escapeHtml(s.title)}</h3>
+                <p style="font-size:0.9rem;">${escapeHtml(s.subtitle)}</p>
+              </div>
+              <div class="stack-sm" style="gap:8px;">
+                <div class="progress-track" style="height:6px;"><div class="progress-fill done-fill" style="width:${pct}%"></div></div>
+                <div class="choice-card-foot" style="padding-top:0;border-top:none;">
+                  <span style="color:var(--ink-subtle);">${sTotal} ${sTotal === 1 ? 'question' : 'questions'}</span>
+                  <span>Open →</span>
+                </div>
+              </div>
+            </a>`;
+          })
+          .join('');
+        return `<section class="stack-sm">
+          <div class="progress-row">
+            <h2 style="margin:0;font-size:1.12rem;">Part ${part} · ${escapeHtml(list[0].partTitle)}</h2>
+            <span style="font-size:0.8rem;color:var(--ink-subtle);">${list.length} ${list.length === 1 ? 'stage' : 'stages'}</span>
+          </div>
+          <div class="choice-grid-3">${cards}</div>
+        </section>`;
+      })
+      .join('');
+
+    return `<div class="stack-lg">
+      <div class="page-head">
+        <div class="progress-row">
+          <div>
+            <h1>Study Order</h1>
+            <p>${stages.length} progressive stages under Parts A–E (${totalQuestionCount} questions total). Pick any stage to open its question list.</p>
+          </div>
+          <strong>${doneSet.size} / ${totalQuestionCount} done</strong>
+        </div>
+      </div>
+      ${sectionsHtml}
+    </div>`;
+  }
+
+  function renderStageQuestionsHtml(stageId) {
+    const stage = stages.find((s) => s.id === stageId) || stages[0];
+    const idx = stages.findIndex((s) => s.id === stage.id);
+    const prevStage = idx > 0 ? stages[idx - 1] : null;
+    const nextStage = idx >= 0 && idx < stages.length - 1 ? stages[idx + 1] : null;
+    const sDone = stage.questions.filter((q) => doneSet.has(q.number)).length;
+    const twoC = stage.questions.filter((q) => q.marks === 2).length;
+    const fiveC = stage.questions.filter((q) => q.marks === 5).length;
+
+    const rows = stage.questions
+      .map((q) =>
+        renderQuestionRowHtml(
+          q,
+          `Q${q.number}`,
+          q.sourceTag,
+          `#/study/stage-${stage.id}/q/${encodeURIComponent(String(q.number))}`,
+          false
+        )
+      )
+      .join('');
+
+    return `<div class="stack-md">
+      <div class="progress-row">
+        <a href="#/study" class="text-link">← All stages</a>
+        <div style="display:flex;gap:8px;">
+          ${prevStage ? `<a href="#/study/stage-${prevStage.id}" class="btn btn-outline">← Stage ${prevStage.id}</a>` : ''}
+          ${nextStage ? `<a href="#/study/stage-${nextStage.id}" class="btn btn-outline">Stage ${nextStage.id} →</a>` : ''}
+        </div>
+      </div>
+      <div class="page-head">
+        <div class="kicker">Part ${stage.part} · ${escapeHtml(stage.partTitle)} · Stage ${stage.id}</div>
+        <h1>${escapeHtml(stage.title)}</h1>
+        <p>${escapeHtml(stage.subtitle)}</p>
+        <div style="font-size:0.82rem;color:var(--ink-subtle);margin-top:6px;">
+          ${sDone} / ${stage.questions.length} done · ${twoC} two-mark · ${fiveC} five-mark
+        </div>
+      </div>
+      <div class="list-panel">${rows}</div>
+    </div>`;
+  }
+
+  function renderUnitsListHtml() {
+    const unitGroups = buildUnitGroups('', 'all', false, false);
+    const cards = unitGroups
+      .map(
+        (u) => `<a href="#/units/${u.unitCode}" class="choice-card">
+          <div class="stack-sm" style="gap:8px;">
+            <div class="progress-row" style="font-size:0.78rem;">
+              <span style="color:var(--accent-ink);font-weight:700;">Unit ${u.unitCode} · ${escapeHtml(u.examTerm)}</span>
+              <span style="color:var(--ink-subtle);">${u.doneQuestions} / ${u.totalQuestions} done</span>
+            </div>
+            <h2>${escapeHtml(u.syllabusTitle)}</h2>
+            <p>${escapeHtml(u.subtitle)}</p>
+          </div>
+          <div class="stack-sm" style="gap:10px;">
+            <div class="progress-track" style="height:6px;"><div class="progress-fill done-fill" style="width:${u.percentDone}%"></div></div>
+            <div class="choice-card-foot" style="padding-top:10px;">
+              <span style="color:var(--ink-muted);">${u.twoMarkSection.totalInUnitForMarks} × 2M · ${u.fiveMarkSection.totalInUnitForMarks} × 5M</span>
+              <span>Open →</span>
+            </div>
+          </div>
+        </a>`
+      )
+      .join('');
+
+    return `<div class="stack-md">
+      <div class="page-head">
+        <div class="progress-row">
+          <div>
+            <h1>Unit-wise</h1>
+            <p>Select a syllabus unit to open its 2-mark and 5-mark question sets (${totalQuestionCount} questions total).</p>
+          </div>
+          <strong>${doneSet.size} / ${totalQuestionCount} done</strong>
+        </div>
+      </div>
+      <div class="choice-grid-3">${cards}</div>
+    </div>`;
+  }
+
+  function renderUnitMarksPickerHtml(unitCode) {
+    const unitGroups = buildUnitGroups('', 'all', false, false);
+    const u = unitGroups.find((x) => x.unitCode === unitCode) || unitGroups[0];
+    const twoCount = u.twoMarkSection.items.length;
+    const twoDone = u.twoMarkSection.items.filter((i) => doneSet.has(i.question.number)).length;
+    const fiveCount = u.fiveMarkSection.items.length;
+    const fiveDone = u.fiveMarkSection.items.filter((i) => doneSet.has(i.question.number)).length;
+
+    const twoCard = twoCount === 0
+      ? `<div class="choice-card disabled" aria-disabled="true"><h2>2 Marks</h2><p>No 2-mark questions in this unit.</p></div>`
+      : `<a href="#/units/${u.unitCode}/2" class="choice-card">
+          <div class="stack-sm">
+            <span style="font-size:0.8rem;color:var(--ink-subtle);">${twoDone} / ${twoCount} done</span>
+            <h2>2 Marks</h2>
+            <p>Short exam definitions, formulas, and concise 3–5 sentence answers.</p>
+          </div>
+          <div class="choice-card-foot"><span>${twoCount} questions</span><span>Open →</span></div>
+        </a>`;
+
+    const fiveCard = fiveCount === 0
+      ? `<div class="choice-card disabled" aria-disabled="true"><h2>5 Marks</h2><p>No 5-mark questions in this unit.</p></div>`
+      : `<a href="#/units/${u.unitCode}/5" class="choice-card">
+          <div class="stack-sm">
+            <span style="font-size:0.8rem;color:var(--ink-subtle);">${fiveDone} / ${fiveCount} done</span>
+            <h2>5 Marks</h2>
+            <p>Long derivations, step-by-step proofs, circuits, and worked numerical examples.</p>
+          </div>
+          <div class="choice-card-foot"><span>${fiveCount} questions</span><span>Open →</span></div>
+        </a>`;
+
+    return `<div class="stack-md">
+      <div><a href="#/units" class="text-link">← All units</a></div>
+      <div class="page-head">
+        <div class="kicker">Unit ${u.unitCode} · ${escapeHtml(u.examTerm)}</div>
+        <h1>${escapeHtml(u.syllabusTitle)}</h1>
+        <p>${escapeHtml(u.subtitle)}</p>
+        <div style="font-size:0.82rem;color:var(--ink-subtle);margin-top:6px;">${u.doneQuestions} / ${u.totalQuestions} done (${u.percentDone}%)</div>
+      </div>
+      <div class="choice-grid-2">${twoCard}${fiveCard}</div>
+    </div>`;
+  }
+
+  function renderUnitQuestionsListHtml(unitCode, marks) {
+    const unitGroups = buildUnitGroups('', 'all', false, false);
+    const u = unitGroups.find((x) => x.unitCode === unitCode) || unitGroups[0];
+    const sec = marks === 2 ? u.twoMarkSection : u.fiveMarkSection;
+    const otherMarks = marks === 2 ? 5 : 2;
+    const otherSec = otherMarks === 2 ? u.twoMarkSection : u.fiveMarkSection;
+    const secDone = sec.items.filter((i) => doneSet.has(i.question.number)).length;
+    const makeHash = (qNum) => `#/units/${u.unitCode}/${marks}/q/${encodeURIComponent(String(qNum))}`;
+
+    let listHtml = '';
+    if (sec.longGroups.length) {
+      const ungrouped = sec.ungroupedItems.length
+        ? `<div class="list-panel">${sec.ungroupedItems
+            .map((i) => renderQuestionRowHtml(i.question, i.sectionNumberPrefix, `${i.parsedTag.bankLabel} · Study #${i.question.number}`, makeHash(i.question.number), false))
+            .join('')}</div>`
+        : '';
+      const groups = sec.longGroups
+        .map(
+          (g) => `<section class="stack-sm" style="gap:8px;">
+            <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-subtle);">${escapeHtml(g.groupLabel)} · Sub-questions (a) and (b)</div>
+            <div class="list-panel">${g.questions
+              .map((i) => renderQuestionRowHtml(i.question, i.sectionNumberPrefix, `${i.parsedTag.bankLabel} · Study #${i.question.number}`, makeHash(i.question.number), false))
+              .join('')}</div>
+          </section>`
+        )
+        .join('');
+      listHtml = `<div class="stack-md">${ungrouped}${groups}</div>`;
+    } else {
+      listHtml = `<div class="list-panel">${sec.items
+        .map((i) => renderQuestionRowHtml(i.question, i.sectionNumberPrefix, `${i.parsedTag.bankLabel} · Study #${i.question.number}`, makeHash(i.question.number), false))
+        .join('')}</div>`;
+    }
+
+    return `<div class="stack-md">
+      <div class="progress-row">
+        <a href="#/units/${u.unitCode}" class="text-link">← Unit ${u.unitCode}</a>
+        ${otherSec.items.length ? `<a href="#/units/${u.unitCode}/${otherMarks}" class="btn btn-outline">Switch to ${otherMarks} Marks (${otherSec.items.length})</a>` : ''}
+      </div>
+      <div class="page-head">
+        <div class="kicker">Unit ${u.unitCode} · ${escapeHtml(u.examTerm)}</div>
+        <h1>${escapeHtml(u.syllabusTitle)} — ${marks} Marks</h1>
+        <p>${secDone} / ${sec.items.length} done · Sequentially numbered starting from 1</p>
+      </div>
+      ${listHtml}
+    </div>`;
+  }
+
+  function resolveQuestionContext(r) {
+    let list = [];
+    let backToListHash = '#/';
+    const unitGroupsAll = buildUnitGroups('', 'all', false, false);
+
+    if (r.page === 'study-question') {
+      const stage = stages.find((s) => s.id === r.stageId);
+      if (stage) {
+        list = stage.questions.map((q) => ({
+          question: q,
+          stageId: stage.id,
+          displayPrefix: String(q.number),
+          metaLabel: `Question ${q.number}`,
+          targetHash: `#/study/stage-${stage.id}/q/${encodeURIComponent(String(q.number))}`,
+        }));
+        backToListHash = `#/study/stage-${stage.id}`;
+      }
+    } else if (r.page === 'unit-question') {
+      const ug = unitGroupsAll.find((u) => u.unitCode === r.unitCode);
+      if (ug) {
+        const sec = r.marks === 2 ? ug.twoMarkSection : ug.fiveMarkSection;
+        list = sec.items.map((item) => ({
+          question: item.question,
+          stageId: item.stageId,
+          displayPrefix: item.sectionNumberPrefix,
+          metaLabel: item.parsedTag.bankLabel,
+          targetHash: `#/units/${ug.unitCode}/${r.marks}/q/${encodeURIComponent(String(item.question.number))}`,
+        }));
+        backToListHash = `#/units/${ug.unitCode}/${r.marks}`;
+      }
+    } else if (r.page === 'all-question') {
+      backToListHash = formatRoute({ page: 'all', scope: r.scope });
+      if (r.scope === 'units') {
+        for (const u of unitGroupsAll) {
+          for (const sec of [u.twoMarkSection, u.fiveMarkSection]) {
+            for (const item of sec.items) {
+              list.push({
+                question: item.question,
+                stageId: item.stageId,
+                displayPrefix: String(item.question.number),
+                metaLabel: item.parsedTag.bankLabel,
+                targetHash: formatRoute({ page: 'all-question', scope: 'units', questionNumber: item.question.number }),
+              });
+            }
+          }
+        }
+      } else {
+        for (const s of stages) {
+          for (const q of s.questions) {
+            list.push({
+              question: q,
+              stageId: s.id,
+              displayPrefix: String(q.number),
+              metaLabel: `Stage ${s.id} · Question ${q.number}`,
+              targetHash: formatRoute({ page: 'all-question', scope: r.scope, questionNumber: q.number }),
+            });
+          }
+        }
+      }
+    } else if (r.page === 'search-question') {
+      backToListHash = formatRoute({ page: 'search', query: r.query });
+      for (const s of stages) {
+        for (const q of s.questions) {
+          if (matchesCriteria(q, r.query, 'all', false, false)) {
+            list.push({
+              question: q,
+              stageId: s.id,
+              displayPrefix: String(q.number),
+              metaLabel: `Stage ${s.id} · Question ${q.number}`,
+              targetHash: formatRoute({ page: 'search-question', query: r.query, questionNumber: q.number }),
+            });
+          }
+        }
+      }
+    }
+
+    let idx = list.findIndex((i) => i.question.number === r.questionNumber);
+    if (idx === -1) {
+      list = stages.flatMap((s) =>
+        s.questions.map((q) => ({
+          question: q,
+          stageId: s.id,
+          displayPrefix: String(q.number),
+          metaLabel: `Stage ${s.id} · Question ${q.number}`,
+          targetHash: `#/study/stage-${s.id}/q/${encodeURIComponent(String(q.number))}`,
+        }))
+      );
+      idx = list.findIndex((i) => i.question.number === r.questionNumber);
+    }
+    if (idx === -1) return null;
+
+    const current = list[idx];
+    const depIds = (examMeta.buildsOn && examMeta.buildsOn[String(current.question.number)]) || [];
+    const buildsOn = depIds.map((id) => locationMap.get(id)).filter(Boolean);
+
+    return {
+      question: current.question,
+      stageId: current.stageId,
+      displayPrefix: current.displayPrefix,
+      metaLabel: current.metaLabel,
+      backToListHash,
+      prev: idx > 0 ? list[idx - 1] : null,
+      next: idx < list.length - 1 ? list[idx + 1] : null,
+      listIndex: idx,
+      listTotal: list.length,
+      buildsOn,
+    };
+  }
+
+  function renderNavStripHtml(ctx, isBottom) {
+    const prevEl = ctx.prev
+      ? `<a href="${ctx.prev.targetHash}" class="btn btn-outline">← Previous</a>`
+      : `<span class="btn btn-outline" aria-disabled="true" style="opacity:0.45;cursor:not-allowed;">← Previous</span>`;
+    const nextEl = ctx.next
+      ? `<a href="${ctx.next.targetHash}" class="btn btn-outline">Next →</a>`
+      : `<span class="btn btn-outline" aria-disabled="true" style="opacity:0.45;cursor:not-allowed;">Next →</span>`;
+
+    return `<div class="reader-nav-strip ${isBottom ? 'bottom' : ''}">
+      <a href="${ctx.backToListHash}" class="text-link">← Back to list</a>
+      <div class="reader-nav-controls">
+        <span class="reader-pos">${ctx.listIndex + 1} / ${ctx.listTotal}</span>
+        ${prevEl}
+        ${nextEl}
+      </div>
+    </div>`;
+  }
+
+  function renderQuestionReaderHtml(r) {
+    const ctx = resolveQuestionContext(r);
+    if (!ctx) return renderHomeHtml();
+
+    const q = ctx.question;
+    const isDone = doneSet.has(q.number);
+    const isStarred = starredSet.has(q.number);
+    const showAns = !practiceMode || revealedQuestions.has(q.number);
+
+    const images = [];
+    const proseHtml = q.sections
+      .map((sec) => {
+        if (sec.image) images.push(sec.image);
+        const label = sec.label ? `<h3 class="answer-section-title">${escapeHtml(sec.label)}</h3>` : '';
+        return `<div>${label}${sec.html}</div>`;
+      })
+      .join('');
+
+    const figuresHtml = images.length
+      ? `<aside class="answer-figures-col" aria-label="Diagrams">${images
+          .map(
+            (img, idx) => `<figure class="figure-card">
+              <button type="button" class="figure-btn" data-open-lightbox="${idx}" aria-label="Enlarge diagram: ${escapeHtml(img.caption)}">
+                <img src="images/${escapeHtml(img.file)}" alt="${escapeHtml(img.caption)}" class="figure-img-capped" />
+                <span class="figure-zoom-hint">Click to view full size</span>
+              </button>
+              <figcaption class="figure-caption"><strong>${escapeHtml(img.caption)}</strong></figcaption>
+            </figure>`
+          )
+          .join('')}</aside>`
+      : '';
+
+    const remHtml = (q.rememberThese || []).map((item) => `<li>${item}</li>`).join('');
+
+    const bodyHtml = !showAns
+      ? `<div class="practice-panel">
+          <span style="color:var(--ink-muted);">Practice mode active — try recalling this answer from memory first.</span>
+          <button type="button" class="btn btn-primary" data-reveal="${q.number}">Show answer</button>
+        </div>`
+      : `<div class="stack-md">
+          ${practiceMode ? `<div style="text-align:right;"><button type="button" class="text-link" style="background:none;border:none;cursor:pointer;" data-reveal="${q.number}">Hide answer</button></div>` : ''}
+          <section class="understand-box">
+            <h2 class="section-label">Understand it</h2>
+            <p>${escapeHtml(q.intuition)}</p>
+          </section>
+          <section>
+            <h2 class="answer-section-heading">Answer</h2>
+            <div class="answer-split-layout ${images.length ? 'has-figures' : ''}">
+              <div class="answer-prose">${proseHtml}</div>
+              ${figuresHtml}
+            </div>
+          </section>
+          <section class="remember-box">
+            <h2 class="section-label">Remember</h2>
+            <ul>${remHtml}</ul>
+          </section>
+        </div>`;
+
+    const depsHtml = ctx.buildsOn.length
+      ? `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+          <strong>Builds on:</strong>
+          ${ctx.buildsOn
+            .map(
+              (dep, idx) =>
+                `<a href="#/units/${dep.unitCode}/${dep.marks}/q/${encodeURIComponent(String(dep.questionNumber))}" class="text-link" style="font-size:0.86rem;">Unit ${dep.unitCode} · ${dep.marks === 2 ? '2M' : '5M'} #${escapeHtml(dep.sectionNumberPrefix)}</a>${idx < ctx.buildsOn.length - 1 ? '<span>·</span>' : ''}`
+            )
+            .join('')}
+        </div>`
+      : '';
+
+    return {
+      images,
+      html: `<article class="stack-md" data-question-number="${q.number}">
+        ${renderNavStripHtml(ctx, false)}
+        <header class="reader-header">
+          <div class="reader-header-top">
+            <div class="reader-meta-line">
+              <strong>${escapeHtml(ctx.metaLabel)}</strong>
+              <span>·</span>
+              <span>${escapeHtml(q.sourceTag)}</span>
+              <span>·</span>
+              <span class="marks-tag ${q.marks === 5 ? 'five' : ''}">${q.marks} marks</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0;">
+              <button type="button" class="btn btn-star" data-star="${q.number}" aria-pressed="${isStarred}">${isStarred ? '★ Starred' : '☆ Star'}</button>
+              <button type="button" class="btn btn-done" data-done="${q.number}" aria-pressed="${isDone}">${isDone ? '✓ Done' : 'Mark done'}</button>
+            </div>
+          </div>
+          <h1 class="reader-question-h1">${escapeHtml(ctx.displayPrefix)}. ${escapeHtml(q.question)}</h1>
+          ${q.questionMathHtml || ''}
+          ${q.orderNote ? `<p class="q-order-note">${escapeHtml(q.orderNote)}</p>` : ''}
+        </header>
+        ${bodyHtml}
+        <div class="reader-cross-links">
+          <a href="#/study/stage-${ctx.stageId}/q/${encodeURIComponent(String(q.number))}" class="text-link">Study order: #${q.number} · Stage ${ctx.stageId} ↗</a>
+          ${depsHtml}
+        </div>
+        ${renderNavStripHtml(ctx, true)}
+      </article>`,
+    };
+  }
+
+  function renderAllOrSearchHtml(r) {
+    const isSearch = r.page === 'search';
+    const query = isSearch ? r.query : aqSearchInput;
+    const scope = r.scope || 'both';
+    const makeTargetHash = (qNum) =>
+      isSearch
+        ? formatRoute({ page: 'search-question', query, questionNumber: qNum })
+        : formatRoute({ page: 'all-question', scope, questionNumber: qNum });
+
+    const scopeTabs = !isSearch
+      ? `<div class="filter-tabs" role="group" aria-label="Choose list scope">
+          <button type="button" class="tab-btn ${scope === 'both' ? 'active' : ''}" data-aq-scope="both">Study Order + Unit-wise</button>
+          <button type="button" class="tab-btn ${scope === 'study' ? 'active' : ''}" data-aq-scope="study">Study Order (${totalQuestionCount})</button>
+          <button type="button" class="tab-btn ${scope === 'units' ? 'active' : ''}" data-aq-scope="units">Unit-wise (${totalQuestionCount})</button>
+        </div>`
+      : '';
+
+    const markTabs = `<div class="filter-tabs" role="group" aria-label="Filter by marks">
+      ${['all', '2', '5']
+        .map(
+          (m) =>
+            `<button type="button" class="tab-btn ${aqMarksFilter === m ? 'active' : ''}" data-aq-mark="${m}">${m === 'all' ? 'All marks' : `${m}-mark`}</button>`
+        )
+        .join('')}
     </div>`;
 
-    if (viewMode === 'units') {
-      const allUnitTerms = buildUnitGroups(true);
-      html += `<button type="button" class="sidebar-btn ${activeView === 'stages' && selectedUnitCode === 'all' ? 'solid-active' : ''}" data-unit="all">
-        <span>All ${UNIT_ORDER.length} Units</span><span class="sidebar-count">${totalQuestionCount} Qs</span></button>`;
-
-      for (const term of allUnitTerms) {
-        html += `<div class="sidebar-part-label">${escapeHtml(term.examTerm)}</div>`;
-        for (const u of term.units) {
-          const isActive = activeView === 'stages' && selectedUnitCode === u.unitCode;
-          html += `<button type="button" class="sidebar-btn ${isActive ? 'active' : ''}" data-unit="${u.unitCode}">
-            <span>${escapeHtml(u.title)}</span>
-            <span class="sidebar-count">${u.doneQuestions}/${u.totalQuestions}</span>
-          </button>`;
+    let resultsHtml = '';
+    if (isSearch) {
+      const items = [];
+      for (const s of stages) {
+        for (const q of s.questions) {
+          if (matchesCriteria(q, query, aqMarksFilter, aqOnlyPending, aqOnlyStarred)) {
+            items.push({ q, stageId: s.id });
+          }
         }
       }
+      resultsHtml = items.length
+        ? `<div class="list-panel">${items
+            .map((i) => renderQuestionRowHtml(i.q, `Q${i.q.number}`, `Stage ${i.stageId} · Question ${i.q.number}`, makeTargetHash(i.q.number), true))
+            .join('')}</div>`
+        : `<div class="guide-card"><p>No questions matched your search.</p></div>`;
     } else {
-      const parts = ['A', 'B', 'C', 'D', 'E'];
-      html += `<button type="button" class="sidebar-btn ${activeView === 'stages' && selectedStageId === 'all' ? 'solid-active' : ''}" data-stage="all">
-        <span>All ${stages.length} Stages</span><span class="sidebar-count">${totalQuestionCount} Qs</span></button>`;
+      const studyBlocks =
+        scope === 'both' || scope === 'study'
+          ? `<section class="stack-md">
+              <h2 style="margin:0;font-size:1.25rem;">Study Order</h2>
+              ${stages
+                .map((s) => {
+                  const qs = s.questions.filter((q) =>
+                    matchesCriteria(q, query, aqMarksFilter, aqOnlyPending, aqOnlyStarred)
+                  );
+                  if (!qs.length) return '';
+                  return `<div class="stack-sm" style="gap:8px;">
+                    <div style="font-size:0.9rem;font-weight:700;">Part ${s.part} · Stage ${s.id}. ${escapeHtml(s.title)}</div>
+                    <div class="list-panel">${qs
+                      .map((q) => renderQuestionRowHtml(q, `Q${q.number}`, '', makeTargetHash(q.number), true))
+                      .join('')}</div>
+                  </div>`;
+                })
+                .join('')}
+            </section>`
+          : '';
 
-      for (const part of parts) {
-        const list = stages.filter((s) => s.part === part);
-        if (!list.length) continue;
-        html += `<div class="sidebar-part-label">Part ${part} · ${escapeHtml(list[0].partTitle)}</div>`;
-        for (const s of list) {
-          const doneCount = s.questions.filter((q) => doneSet.has(q.number)).length;
-          const isActive = activeView === 'stages' && selectedStageId === s.id;
-          html += `<button type="button" class="sidebar-btn ${isActive ? 'active' : ''}" data-stage="${s.id}">
-            <span>${s.id}. ${escapeHtml(s.title)}</span>
-            <span class="sidebar-count">${doneCount}/${s.questions.length}</span>
-          </button>`;
-        }
-      }
+      const unitGroups = buildUnitGroups(query, aqMarksFilter, aqOnlyPending, aqOnlyStarred);
+      const unitBlocks =
+        scope === 'both' || scope === 'units'
+          ? `<section class="stack-md">
+              <h2 style="margin:0;font-size:1.25rem;">Unit-wise</h2>
+              ${unitGroups
+                .map((u) => {
+                  const sections = [
+                    aqMarksFilter !== '5' ? u.twoMarkSection : null,
+                    aqMarksFilter !== '2' ? u.fiveMarkSection : null,
+                  ].filter((sec) => sec && sec.items.length > 0);
+                  if (!sections.length) return '';
+                  return sections
+                    .map(
+                      (sec) => `<div class="stack-sm" style="gap:8px;">
+                        <div style="font-size:0.9rem;font-weight:700;">${escapeHtml(sec.title)} (${sec.items.length})</div>
+                        <div class="list-panel">${sec.items
+                          .map((item) =>
+                            renderQuestionRowHtml(
+                              item.question,
+                              item.sectionNumberPrefix,
+                              item.parsedTag.bankLabel,
+                              makeTargetHash(item.question.number),
+                              true
+                            )
+                          )
+                          .join('')}</div>
+                      </div>`
+                    )
+                    .join('');
+                })
+                .join('')}
+            </section>`
+          : '';
+
+      resultsHtml = `<div class="stack-lg">${studyBlocks}${unitBlocks}</div>`;
     }
 
-    container.innerHTML = html;
+    const heading = isSearch
+      ? query.trim()
+        ? `Search: “${escapeHtml(query.trim())}”`
+        : 'Search Questions'
+      : `All Questions (${totalQuestionCount})`;
 
-    container.querySelectorAll('[data-view]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        activeView = btn.getAttribute('data-view');
-        syncViewModeUrlAndStorage();
-        closeSidebar();
-        renderAll();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-    });
-
-    container.querySelectorAll('[data-stage]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const val = btn.getAttribute('data-stage');
-        activeView = 'stages';
-        viewMode = 'study';
-        selectedStageId = val === 'all' ? 'all' : Number(val);
-        if (selectedStageId !== 'all') expandedStages.add(selectedStageId);
-        syncViewModeUrlAndStorage();
-        closeSidebar();
-        renderAll();
-      });
-    });
-
-    container.querySelectorAll('[data-unit]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const val = btn.getAttribute('data-unit');
-        activeView = 'stages';
-        viewMode = 'units';
-        selectedUnitCode = val;
-        if (val !== 'all') {
-          expandedSectionIds.add(`unit-${val}-2`);
-          expandedSectionIds.add(`unit-${val}-5`);
-        }
-        syncViewModeUrlAndStorage();
-        closeSidebar();
-        renderAll();
-      });
-    });
+    return `<div class="stack-md">
+      <div class="progress-row">
+        <a href="#/" class="text-link">← Home</a>
+        ${scopeTabs}
+      </div>
+      <div class="page-head">
+        <h1>${heading}</h1>
+        <p>${isSearch ? 'Matching questions across prompts, answers, formulas, and tags. Click any row to open its full answer.' : 'Every question across the bank in exact wording—click any question to open its full answer.'}</p>
+        <div class="filter-bar">
+          ${!isSearch ? `<input type="search" id="aq-local-search" value="${escapeHtml(aqSearchInput)}" placeholder="Filter questions by keyword, Q#, or tag..." aria-label="Filter all questions" />` : ''}
+          ${markTabs}
+          <button type="button" id="aq-star-filter" class="btn btn-star" aria-pressed="${aqOnlyStarred}">★ Starred (${starredSet.size})</button>
+          <button type="button" id="aq-pending-filter" class="btn btn-outline" aria-pressed="${aqOnlyPending}">Hide done</button>
+        </div>
+      </div>
+      ${resultsHtml}
+    </div>`;
   }
 
-  function renderGuideView() {
-    const container = document.getElementById('guide-container');
-    if (!container || !guide || !guide.sections) return;
+  function renderGuideHtml(mode) {
+    if (!guide || !guide.sections) return '';
     const g = guide.sections;
-    const isSourcesOnly = activeView === 'sources';
+    const isSourcesOnly = mode === 'sources';
     const plan = g.part2HowToStudy.studyPlans[selectedPlanIdx] || g.part2HowToStudy.studyPlans[0];
     const vg = guide.viewGuide;
 
-    let html = `<div class="guide-stack">
-      <section class="guide-card">
-        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
-          <button type="button" class="btn btn-outline" id="guide-back-btn">← Back to ${totalQuestionCount} Questions</button>
-          <div class="filter-tabs">
-            <button type="button" class="tab-btn ${!isSourcesOnly ? 'active' : ''}" data-switch-guide="guide">Start Here Guide</button>
-            <button type="button" class="tab-btn ${isSourcesOnly ? 'active' : ''}" data-switch-guide="sources">Sources &amp; Coverage</button>
-          </div>
+    let html = `<div class="stack-md">
+      <div class="progress-row">
+        <a href="#/" class="text-link">← Home</a>
+        <div class="filter-tabs">
+          <a href="#/guide" class="tab-btn ${!isSourcesOnly ? 'active' : ''}">Start Here Guide</a>
+          <a href="#/sources" class="tab-btn ${isSourcesOnly ? 'active' : ''}">Sources &amp; Coverage</a>
         </div>
+      </div>
+      <div class="page-head">
         <h1>${isSourcesOnly ? 'Sources, Note Coverage &amp; Diagram Map' : 'Start Here — Complete Study Guide'}</h1>
         <p>${isSourcesOnly
           ? 'Exact mapping from your 5 unit folders, the attached Unit I–V answer booklet, textbook supplements, note differences, and uncovered syllabus topics.'
@@ -700,7 +1257,7 @@
           <a class="guide-anchor-pill" href="#off-part-5">5. Not covered</a>
           <a class="guide-anchor-pill" href="#off-part-6">6. Writing answers</a>
         </div>` : ''}
-      </section>`;
+      </div>`;
 
     if (!isSourcesOnly && vg) {
       html += `<section class="guide-card" id="off-part-views" style="background:var(--accent-soft);border-color:var(--accent-border);">
@@ -724,7 +1281,7 @@
             <h3>2-Mark vs. 5-Mark Practice</h3>
             <p>${escapeHtml(g.part2HowToStudy.shortVsLong)}</p>
           </div>
-          <div class="guide-subbox" style="background:var(--accent-soft);border-color:var(--accent-border);">
+          <div class="guide-subbox" style="background:var(--accent-soft);">
             <h3>Twin Questions Shortcut</h3>
             <p>${escapeHtml(g.part2HowToStudy.twinQuestionsNote)}</p>
           </div>
@@ -732,18 +1289,18 @@
         <div class="guide-subbox">
           <h3>What to Memorize by Heart (Understand WHY First)</h3>
           <p style="margin-bottom:8px;"><strong>Core Principle:</strong> ${escapeHtml(g.part2HowToStudy.memorizeMustKnow.understandWhyRule)}</p>
-          <strong style="font-size:0.78rem;">Key Formulas &amp; Numbers</strong>
-          <ul>${g.part2HowToStudy.memorizeMustKnow.formulas.map((f) => `<li style="font-family:var(--font-mono);font-size:0.8rem;">${escapeHtml(f)}</li>`).join('')}</ul>
-          <strong style="font-size:0.78rem;display:block;margin-top:8px;">Circuits &amp; Diagrams to Sketch on Paper</strong>
+          <strong style="font-size:0.8rem;">Key Formulas &amp; Numbers</strong>
+          <ul>${g.part2HowToStudy.memorizeMustKnow.formulas.map((f) => `<li style="font-family:var(--font-mono);font-size:0.82rem;">${escapeHtml(f)}</li>`).join('')}</ul>
+          <strong style="font-size:0.8rem;display:block;margin-top:8px;">Circuits &amp; Diagrams to Sketch on Paper</strong>
           <ul>${g.part2HowToStudy.memorizeMustKnow.circuitsAndDiagrams.map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul>
         </div>
         <div>
-          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+          <div class="progress-row" style="margin-bottom:8px;">
             <strong>Realistic Study Time Plans</strong>
             <div class="filter-tabs">
-              ${['12-Hour Plan', '10-Hour Plan', '5-Hour Crash'].map((lbl, idx) =>
-                `<button type="button" class="tab-btn ${selectedPlanIdx === idx ? 'active' : ''}" data-plan-idx="${idx}">${lbl}</button>`
-              ).join('')}
+              ${['12-Hour Plan', '10-Hour Plan', '5-Hour Crash']
+                .map((lbl, idx) => `<button type="button" class="tab-btn ${selectedPlanIdx === idx ? 'active' : ''}" data-plan-idx="${idx}">${lbl}</button>`)
+                .join('')}
             </div>
           </div>
           <div class="guide-subbox">
@@ -757,10 +1314,9 @@
       html += `<section class="guide-card" id="off-part-3">
         <h2>${escapeHtml(g.part3HowToUseApp.heading)}</h2>
         <div class="guide-grid">
-          ${g.part3HowToUseApp.features.map((f) => `<div class="guide-subbox">
-            <h3>${escapeHtml(f.name)}</h3>
-            <p>${escapeHtml(f.detail)}</p>
-          </div>`).join('')}
+          ${g.part3HowToUseApp.features
+            .map((f) => `<div class="guide-subbox"><h3>${escapeHtml(f.name)}</h3><p>${escapeHtml(f.detail)}</p></div>`)
+            .join('')}
         </div>
       </section>`;
     }
@@ -773,1049 +1329,323 @@
         <table class="q-table">
           <thead><tr><th>Stage</th><th>Qs</th><th>Class Note Files Used</th><th>Notes &amp; Supplements</th></tr></thead>
           <tbody>
-            ${g.part4Sources.stageSources.map((row) => `<tr>
-              <td><button type="button" class="btn-icon" style="color:var(--accent-ink);text-align:left;padding:0;font-size:0.84rem;" data-open-stage="${row.stageId}">Stage ${row.stageId}: ${escapeHtml(row.title)}</button></td>
-              <td style="white-space:nowrap;font-family:var(--font-mono);font-size:0.78rem;">${escapeHtml(row.questionRange)}</td>
-              <td style="font-size:0.78rem;">${escapeHtml(row.primaryFiles)}</td>
-              <td style="font-size:0.78rem;color:var(--ink-muted);">${escapeHtml(row.supplementalNotes)}</td>
-            </tr>`).join('')}
+            ${g.part4Sources.stageSources
+              .map(
+                (row) => `<tr>
+                  <td><a href="#/study/stage-${row.stageId}" class="text-link" style="font-size:0.86rem;">Stage ${row.stageId}: ${escapeHtml(row.title)}</a></td>
+                  <td style="white-space:nowrap;font-family:var(--font-mono);font-size:0.8rem;">${escapeHtml(row.questionRange)}</td>
+                  <td style="font-size:0.8rem;">${escapeHtml(row.primaryFiles)}</td>
+                  <td style="font-size:0.8rem;color:var(--ink-muted);">${escapeHtml(row.supplementalNotes)}</td>
+                </tr>`
+              )
+              .join('')}
           </tbody>
         </table>
       </div>
       <strong>Verified Differences Across Class Note Files</strong>
-      ${g.part4Sources.disagreements.map((d) => `<div class="guide-subbox">
-        <h3>${escapeHtml(d.topic)}</h3>
-        <p>${escapeHtml(d.difference)}</p>
-        <p style="margin-top:4px;color:var(--accent-ink);"><strong>Handled here:</strong> ${escapeHtml(d.howHandled)}</p>
-      </div>`).join('')}
+      ${g.part4Sources.disagreements
+        .map(
+          (d) => `<div class="guide-subbox">
+            <h3>${escapeHtml(d.topic)}</h3>
+            <p>${escapeHtml(d.difference)}</p>
+            <p style="margin-top:4px;color:var(--accent-ink);"><strong>Handled here:</strong> ${escapeHtml(d.howHandled)}</p>
+          </div>`
+        )
+        .join('')}
       <strong>Why Some Questions Have No Diagram Image</strong>
       <p>${escapeHtml(g.part4Sources.missingDiagramsSummary)}</p>
       <div class="guide-grid">
-        ${g.part4Sources.missingDiagramGroups.map((mg) => `<div class="guide-subbox">
-          <h3>${escapeHtml(mg.category)}</h3>
-          <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--accent-ink);margin-bottom:4px;">${escapeHtml(mg.questions)}</div>
-          <p>${escapeHtml(mg.reason)}</p>
-        </div>`).join('')}
+        ${g.part4Sources.missingDiagramGroups
+          .map(
+            (mg) => `<div class="guide-subbox">
+              <h3>${escapeHtml(mg.category)}</h3>
+              <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--accent-ink);margin-bottom:4px;">${escapeHtml(mg.questions)}</div>
+              <p>${escapeHtml(mg.reason)}</p>
+            </div>`
+          )
+          .join('')}
       </div>
     </section>`;
 
     html += `<section class="guide-card" id="off-part-5">
       <h2>${escapeHtml(g.part5Uncovered.heading)}</h2>
       <p>${escapeHtml(g.part5Uncovered.intro)}</p>
-      ${g.part5Uncovered.units.map((u) => `<div class="guide-subbox">
-        <h3>${escapeHtml(u.unit)}</h3>
-        <ul>${u.topicsNotInQuestions.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-      </div>`).join('')}
+      ${g.part5Uncovered.units
+        .map(
+          (u) => `<div class="guide-subbox"><h3>${escapeHtml(u.unit)}</h3><ul>${u.topicsNotInQuestions.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>`
+        )
+        .join('')}
     </section>`;
 
     if (!isSourcesOnly) {
       html += `<section class="guide-card" id="off-part-6">
         <h2>${escapeHtml(g.part6ExamWriting.heading)}</h2>
         <ul>${g.part6ExamWriting.tips.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-        <div>
-          <button type="button" class="btn btn-primary" data-open-stage="1">Start Studying Stage 1 Now</button>
-        </div>
+        <div><a href="#/study/stage-1" class="btn btn-primary">Start Studying Stage 1 Now</a></div>
       </section>`;
     }
 
-    html += '</div>';
-    container.innerHTML = html;
-
-    document.getElementById('guide-back-btn')?.addEventListener('click', () => {
-      activeView = 'stages';
-      renderAll();
-    });
-    container.querySelectorAll('[data-switch-guide]').forEach((b) => {
-      b.addEventListener('click', () => {
-        activeView = b.getAttribute('data-switch-guide');
-        renderAll();
-      });
-    });
-    container.querySelectorAll('[data-plan-idx]').forEach((b) => {
-      b.addEventListener('click', () => {
-        selectedPlanIdx = Number(b.getAttribute('data-plan-idx'));
-        renderGuideView();
-      });
-    });
-    container.querySelectorAll('[data-open-stage]').forEach((b) => {
-      b.addEventListener('click', () => {
-        const sid = Number(b.getAttribute('data-open-stage'));
-        activeView = 'stages';
-        viewMode = 'study';
-        selectedStageId = sid;
-        expandedStages.add(sid);
-        syncViewModeUrlAndStorage();
-        renderAll();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-    });
+    html += `</div>`;
+    return html;
   }
 
-  function renderQuestion(q, options = {}) {
-    const isDone = doneSet.has(q.number);
-    const isStarred = starredSet.has(q.number);
-    const isCollapsed = Boolean(options.isCollapsed);
-    const showAns = !practiceMode || revealedQuestions.has(q.number);
-    const loc = locationMap.get(q.number);
-    const isSearching = searchQuery.trim().length > 0;
-    const searchContextLine = isSearching && loc
-      ? `In Exam View: ${loc.examTerm} · Unit ${loc.unitCode} · ${loc.sectionTitle} · #${loc.sectionNumberPrefix} (${loc.bankLabel}) · In Study Order: Stage ${loc.stageId} (#${q.number})`
-      : '';
-
-    let bodyHtml = '';
-    if (!isCollapsed) {
-      if (!showAns) {
-        bodyHtml = `<div class="practice-prompt">
-          <span>Practice mode active — try recalling this answer from memory first.</span>
-          <button type="button" class="btn btn-primary" data-reveal="${q.number}">Show answer</button>
-        </div>`;
-      } else {
-        const hideBtn = practiceMode ? `<div style="text-align:right;margin-top:8px;"><button type="button" class="btn btn-outline" data-reveal="${q.number}">Hide answer</button></div>` : '';
-        const images = [];
-        const sectionsHtml = q.sections.map((sec) => {
-          const label = sec.label ? `<h4 class="answer-section-title">${escapeHtml(sec.label)}</h4>` : '';
-          if (sec.image) images.push(sec.image);
-          const img = sec.image ? `<figure class="diagram-figure">
-            <div class="diagram-frame"><img src="images/${escapeHtml(sec.image.file)}" alt="${escapeHtml(sec.image.caption)}" /></div>
-            <figcaption class="diagram-caption"><strong>${escapeHtml(sec.image.caption)}</strong></figcaption>
-          </figure>` : '';
-          return `${label}<div>${sec.html}</div>${img}`;
-        }).join('');
-
-        const rem = (q.rememberThese || []).map((r) => `<li>${r}</li>`).join('');
-        const supBadge = q.usesTextbookSupplement ? '<span class="source-pill">Includes textbook supplement</span>' : '';
-        const imgList = images.length
-          ? `<ul>${images.map((im) => `<li><strong>${escapeHtml(im.caption)}</strong>${im.kindLabel ? ` (${escapeHtml(im.kindLabel)})` : ''} — <code>${escapeHtml(im.source)}</code></li>`).join('')}</ul>`
-          : '';
-        const noDiag = q.noDiagramNote ? `<p><strong>Diagram note:</strong> ${escapeHtml(q.noDiagramNote)}</p>` : '';
-
-        bodyHtml = `${hideBtn}
-          <div class="intuition-box"><div class="box-label">Understand it</div><div>${escapeHtml(q.intuition)}</div></div>
-          <div class="exam-answer-box">
-            <div class="box-label">Write this in the exam</div>
-            <div class="answer-body">${sectionsHtml}</div>
-          </div>
-          <div class="remember-box"><div class="box-label">Remember these</div><ul>${rem}</ul></div>
-          <div class="source-box">
-            <div class="box-label">Source (for study, not for the exam)</div>
-            <p><strong>Notes used:</strong> <code>${escapeHtml(q.studySource || '')}</code>${supBadge}</p>
-            ${imgList}
-            ${noDiag}
-          </div>`;
-      }
-    }
-
-    let examLinksHtml = '';
-    if (options.examItem) {
-      const item = options.examItem;
-      const depsHtml = item.buildsOn.length
-        ? `<div class="builds-on-row"><span><strong>Builds on:</strong></span>${item.buildsOn.map((dep, idx) =>
-            `<button type="button" class="link-inline-btn" data-jump-dep="${dep.questionNumber}" title="Study order #${dep.questionNumber} · Stage ${dep.stageId}">Unit ${dep.unitCode} · ${dep.marks === 2 ? '2M' : '5M'} #${escapeHtml(dep.sectionNumberPrefix)}</button>${idx < item.buildsOn.length - 1 ? '<span>·</span>' : ''}`
-          ).join('')}</div>`
-        : '';
-      examLinksHtml = `<div class="q-exam-links">
-        <button type="button" class="link-inline-btn" data-open-study="${q.number}" data-open-stage="${item.stageId}">
-          Study order: #${q.number} · Stage ${item.stageId} ↗
-        </button>
-        ${depsHtml}
-      </div>`;
-    }
-
-    const collapseBtn = options.examItem
-      ? `<button type="button" class="btn btn-outline" data-collapse-card="${q.number}" aria-expanded="${!isCollapsed}">${isCollapsed ? '▶ Expand' : '▼ Hide'}</button>`
-      : '';
-
-    const metaLead = options.examItem
-      ? `<span><strong>${escapeHtml(options.examItem.parsedTag.bankLabel)}</strong></span> ·`
-      : `<span><strong>Question ${q.number}</strong></span> ·`;
-    const headingPrefix = options.examItem
-      ? options.examItem.sectionNumberPrefix
-      : String(q.number);
-
-    return `<article class="q-card ${isDone ? 'done' : ''}" id="q-${q.number}" data-question-number="${q.number}">
-      <div class="q-head ${isCollapsed ? 'collapsed' : ''}">
-        <div style="flex:1 1 320px;">
-          <div class="q-meta">
-            ${metaLead}
-            <span>${escapeHtml(q.sourceTag)}</span> ·
-            <span class="marks-tag ${q.marks === 5 ? 'five' : ''}">${q.marks} marks</span>
-          </div>
-          <h3 class="q-title">${escapeHtml(headingPrefix)}. ${escapeHtml(q.question)}</h3>
-          ${q.questionMathHtml || ''}
-          ${q.orderNote ? `<p class="q-order-note">${escapeHtml(q.orderNote)}</p>` : ''}
-          ${searchContextLine ? `<p class="q-search-context">${escapeHtml(searchContextLine)}</p>` : ''}
-          ${examLinksHtml}
-        </div>
-        <div class="q-card-actions">
-          <button type="button" class="btn btn-star" data-star="${q.number}" aria-pressed="${isStarred}">
-            ${isStarred ? '★ Starred' : '☆ Star'}
-          </button>
-          <button type="button" class="btn btn-done" data-done="${q.number}" aria-pressed="${isDone}">
-            ${isDone ? '✓ Done' : 'Mark done'}
-          </button>
-          ${collapseBtn}
-        </div>
-      </div>
-      ${bodyHtml}
-    </article>`;
+  function openLightbox(img) {
+    const modal = document.getElementById('lightbox-modal');
+    const cap = document.getElementById('lightbox-caption');
+    const el = document.getElementById('lightbox-img');
+    if (!modal || !cap || !el || !img) return;
+    cap.textContent = img.caption || '';
+    el.setAttribute('src', `images/${img.file}`);
+    el.setAttribute('alt', img.caption || '');
+    modal.hidden = false;
   }
 
-  function updateToolbarSummary(visibleCount) {
-    const allQs = stages.flatMap((s) => s.questions);
-    const totalQuestions = allQs.length;
-    const twoMark = allQs.filter((q) => q.marks === 2).length;
-    const fiveMark = allQs.filter((q) => q.marks === 5).length;
-    const pct = totalQuestions ? Math.round((doneSet.size / totalQuestions) * 100) : 0;
-
-    document.getElementById('progress-text').textContent = `${doneSet.size} of ${totalQuestions} questions marked done (${pct}%)`;
-    document.getElementById('visible-sub').textContent = `Showing ${visibleCount} matching · ${twoMark} two-mark · ${fiveMark} five-mark · ${starredSet.size} starred`;
-    document.getElementById('progress-fill').style.width = `${pct}%`;
-    document.getElementById('progress-bar').setAttribute('aria-valuenow', String(pct));
-
-    const starBtn = document.getElementById('starred-only-btn');
-    if (starBtn) {
-      starBtn.textContent = `★ Starred (${starredSet.size})`;
-      starBtn.setAttribute('aria-pressed', String(onlyStarred));
-    }
-
-    const expandAllBtn = document.getElementById('expand-all-btn');
-    if (expandAllBtn) {
-      if (viewMode === 'units') {
-        expandAllBtn.textContent = expandedSectionIds.size === ALL_UNIT_SECTION_IDS.length ? 'Collapse all sections' : 'Expand all sections';
-      } else {
-        expandAllBtn.textContent = expandedStages.size === stages.length ? 'Collapse all stages' : 'Expand all stages';
-      }
-    }
+  function closeLightbox() {
+    const modal = document.getElementById('lightbox-modal');
+    if (modal) modal.hidden = true;
   }
 
-  function bindCardActionListeners(container) {
-    container.querySelectorAll('[data-done]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+  function bindDynamicEvents(rootEl, currentRoute, readerImages) {
+    rootEl.querySelectorAll('[data-done]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const num = parseIdToken(btn.getAttribute('data-done'));
         if (num === null) return;
-        if (doneSet.has(num)) doneSet.delete(num); else doneSet.add(num);
+        if (doneSet.has(num)) doneSet.delete(num);
+        else doneSet.add(num);
         saveIdList(DONE_KEY, doneSet);
-        renderAll();
+        renderCurrentRoute();
       });
     });
 
-    container.querySelectorAll('[data-star]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+    rootEl.querySelectorAll('[data-star]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const num = parseIdToken(btn.getAttribute('data-star'));
         if (num === null) return;
-        if (starredSet.has(num)) starredSet.delete(num); else starredSet.add(num);
+        if (starredSet.has(num)) starredSet.delete(num);
+        else starredSet.add(num);
         saveIdList(STAR_KEY, starredSet);
-        renderAll();
+        renderCurrentRoute();
       });
     });
 
-    container.querySelectorAll('[data-reveal]').forEach((btn) => {
+    rootEl.querySelectorAll('[data-reveal]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const num = parseIdToken(btn.getAttribute('data-reveal'));
         if (num === null) return;
-        if (revealedQuestions.has(num)) revealedQuestions.delete(num); else revealedQuestions.add(num);
-        renderMainQuestionArea();
+        if (revealedQuestions.has(num)) revealedQuestions.delete(num);
+        else revealedQuestions.add(num);
+        renderCurrentRoute();
       });
     });
 
-    container.querySelectorAll('[data-collapse-card]').forEach((btn) => {
+    rootEl.querySelectorAll('[data-open-lightbox]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const num = parseIdToken(btn.getAttribute('data-collapse-card'));
-        if (num === null) return;
-        if (collapsedExamCards.has(num)) collapsedExamCards.delete(num); else collapsedExamCards.add(num);
-        renderExamView();
+        const idx = Number(btn.getAttribute('data-open-lightbox'));
+        if (readerImages && readerImages[idx]) openLightbox(readerImages[idx]);
       });
     });
 
-    container.querySelectorAll('[data-open-study]').forEach((btn) => {
+    document.getElementById('home-theme-btn')?.addEventListener('click', () => {
+      applyTheme(theme === 'dark' ? 'light' : 'dark');
+      renderCurrentRoute();
+    });
+
+    document.getElementById('home-reset-btn')?.addEventListener('click', () => {
+      confirmingReset = true;
+      renderCurrentRoute();
+    });
+
+    document.getElementById('home-reset-confirm')?.addEventListener('click', () => {
+      doneSet = new Set();
+      saveIdList(DONE_KEY, doneSet);
+      confirmingReset = false;
+      renderCurrentRoute();
+    });
+
+    document.getElementById('home-reset-cancel')?.addEventListener('click', () => {
+      confirmingReset = false;
+      renderCurrentRoute();
+    });
+
+    rootEl.querySelectorAll('[data-aq-scope]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const qNum = parseIdToken(btn.getAttribute('data-open-study'));
-        const sid = Number(btn.getAttribute('data-open-stage'));
-        if (qNum === null) return;
-        activeView = 'stages';
-        viewMode = 'study';
-        if (selectedStageId !== 'all' && selectedStageId !== sid) selectedStageId = 'all';
-        expandedStages.add(sid);
-        syncViewModeUrlAndStorage();
-        renderAll();
-        scrollToQuestionElement(qNum);
+        const s = btn.getAttribute('data-aq-scope');
+        window.location.hash = formatRoute({ page: 'all', scope: s });
       });
     });
 
-    container.querySelectorAll('[data-jump-dep]').forEach((btn) => {
+    rootEl.querySelectorAll('[data-aq-mark]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const depNum = parseIdToken(btn.getAttribute('data-jump-dep'));
-        const loc = depNum !== null ? locationMap.get(depNum) : null;
-        if (!loc) return;
-        activeView = 'stages';
-        viewMode = 'units';
-        if (selectedUnitCode !== 'all' && selectedUnitCode !== loc.unitCode) selectedUnitCode = 'all';
-        expandedSectionIds.add(`unit-${loc.unitCode}-${loc.marks}`);
-        collapsedExamCards.delete(depNum);
-        syncViewModeUrlAndStorage();
-        renderAll();
-        scrollToQuestionElement(depNum);
+        aqMarksFilter = btn.getAttribute('data-aq-mark');
+        renderCurrentRoute();
+      });
+    });
+
+    document.getElementById('aq-star-filter')?.addEventListener('click', () => {
+      aqOnlyStarred = !aqOnlyStarred;
+      renderCurrentRoute();
+    });
+
+    document.getElementById('aq-pending-filter')?.addEventListener('click', () => {
+      aqOnlyPending = !aqOnlyPending;
+      renderCurrentRoute();
+    });
+
+    const localSearchEl = document.getElementById('aq-local-search');
+    if (localSearchEl) {
+      localSearchEl.addEventListener('input', (e) => {
+        aqSearchInput = e.target.value;
+        const pos = localSearchEl.selectionStart;
+        renderCurrentRoute();
+        const el2 = document.getElementById('aq-local-search');
+        if (el2) {
+          el2.focus();
+          if (typeof pos === 'number') el2.setSelectionRange(pos, pos);
+        }
+      });
+    }
+
+    rootEl.querySelectorAll('[data-plan-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        selectedPlanIdx = Number(btn.getAttribute('data-plan-idx'));
+        renderCurrentRoute();
+      });
+    });
+
+    rootEl.querySelectorAll('.guide-anchor-pill').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const id = a.getAttribute('href').slice(1);
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
       });
     });
   }
 
-  function renderStages() {
-    const container = document.getElementById('stages-container');
-    if (!container) return;
-    const filtered = [];
-    let visibleCount = 0;
+  function renderCurrentRoute() {
+    const r = parseRoute(window.location.hash);
+    renderTopBar(r);
+    const root = document.getElementById('app-root');
+    if (!root) return;
 
-    for (const stage of stages) {
-      if (selectedStageId !== 'all' && stage.id !== selectedStageId) continue;
-      const qs = stage.questions.filter(matchesQuestion);
-      if (qs.length) {
-        visibleCount += qs.length;
-        filtered.push({ stage, qs });
-      }
-    }
-
-    updateToolbarSummary(visibleCount);
-
-    const autoExpand = Boolean(searchQuery.trim() || marksFilter !== 'all' || onlyPending || onlyStarred || selectedStageId !== 'all');
-    if (!filtered.length) {
-      container.innerHTML = `<div class="q-card"><p>No questions match your current filters. Clear search or reset filters.</p></div>`;
-      return;
-    }
-
-    container.innerHTML = filtered.map(({ stage, qs }) => {
-      const isExpanded = autoExpand || expandedStages.has(stage.id);
-      const doneInStage = qs.filter((q) => doneSet.has(q.number)).length;
-      const qRange = qs.length === 1 ? `Q${qs[0].number}` : `Q${qs[0].number}–Q${qs[qs.length - 1].number}`;
-      return `<section class="stage-card" id="stage-${stage.id}">
-        <button type="button" class="stage-toggle" data-toggle-stage="${stage.id}" aria-expanded="${isExpanded}">
-          <div>
-            <div class="stage-meta">
-              <span class="stage-part-text">Part ${stage.part} · ${escapeHtml(stage.partTitle)}</span> · ${qRange} · ${doneInStage}/${qs.length} done
-            </div>
-            <h2 class="stage-title">Stage ${stage.id}. ${escapeHtml(stage.title)}</h2>
-            <p class="stage-subtitle">${escapeHtml(stage.subtitle)}</p>
-          </div>
-          <span>${isExpanded ? '▼' : '▶'}</span>
-        </button>
-        ${isExpanded ? `<div class="stage-questions">${qs.map((q) => renderQuestion(q)).join('')}</div>` : ''}
-      </section>`;
-    }).join('');
-
-    container.querySelectorAll('[data-toggle-stage]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = Number(btn.getAttribute('data-toggle-stage'));
-        if (expandedStages.has(id)) expandedStages.delete(id); else expandedStages.add(id);
-        renderStages();
-      });
-    });
-
-    bindCardActionListeners(container);
-  }
-
-  function renderExamSection(sec, isSearching) {
-    const isExpanded = isSearching || expandedSectionIds.has(sec.id);
-    const qNums = sec.items.map((i) => i.question.number);
-    const hasItems = sec.items.length > 0;
-
-    let bodyHtml = '';
-    if (isExpanded) {
-      if (!hasItems) {
-        bodyHtml = `<div class="exam-section-body"><p style="margin:0;color:var(--ink-subtle);font-style:italic;font-size:0.86rem;">No ${sec.marks}-mark questions in this unit (0 questions).</p></div>`;
+    let readerImages = null;
+    if (r.page === 'home') {
+      root.innerHTML = renderHomeHtml();
+    } else if (r.page === 'study-stages') {
+      root.innerHTML = renderStudyStagesHtml();
+    } else if (r.page === 'study-stage') {
+      root.innerHTML = renderStageQuestionsHtml(r.stageId);
+    } else if (r.page === 'units-list') {
+      root.innerHTML = renderUnitsListHtml();
+    } else if (r.page === 'unit-marks') {
+      root.innerHTML = renderUnitMarksPickerHtml(r.unitCode);
+    } else if (r.page === 'unit-questions') {
+      root.innerHTML = renderUnitQuestionsListHtml(r.unitCode, r.marks);
+    } else if (
+      r.page === 'study-question' ||
+      r.page === 'unit-question' ||
+      r.page === 'all-question' ||
+      r.page === 'search-question'
+    ) {
+      const rendered = renderQuestionReaderHtml(r);
+      if (typeof rendered === 'string') {
+        root.innerHTML = rendered;
       } else {
-        const ungroupedHtml = sec.ungroupedItems.map((item) =>
-          renderQuestion(item.question, { examItem: item, isCollapsed: collapsedExamCards.has(item.question.number) })
-        ).join('');
-        const longHtml = sec.longGroups.map((g) => `<div class="long-group">
-          <div class="long-group-label">${escapeHtml(g.groupLabel)} · Sub-questions (a) and (b)</div>
-          ${g.questions.map((item) =>
-            renderQuestion(item.question, { examItem: item, isCollapsed: collapsedExamCards.has(item.question.number) })
-          ).join('')}
-        </div>`).join('');
-        bodyHtml = `<div class="exam-section-body">${ungroupedHtml}${longHtml}</div>`;
+        root.innerHTML = rendered.html;
+        readerImages = rendered.images;
       }
+    } else if (r.page === 'all' || r.page === 'search') {
+      root.innerHTML = renderAllOrSearchHtml(r);
+    } else if (r.page === 'guide' || r.page === 'sources') {
+      root.innerHTML = renderGuideHtml(r.page);
+    } else {
+      root.innerHTML = renderHomeHtml();
     }
 
-    return `<div class="exam-section" id="${sec.id}">
-      <div class="exam-section-head">
-        <button type="button" class="exam-section-toggle" data-toggle-section="${sec.id}" aria-expanded="${isExpanded}">
-          <span>${isExpanded ? '▼' : '▶'}</span>
-          <span>${escapeHtml(sec.title)} (${sec.items.length})</span>
-        </button>
-        ${hasItems ? `<div class="exam-section-actions">
-          <button type="button" class="btn btn-outline" data-sec-expand="${sec.id}" data-sec-qs="${qNums.join(',')}">Expand all</button>
-          <button type="button" class="btn btn-outline" data-sec-collapse="${sec.id}" data-sec-qs="${qNums.join(',')}">Collapse all</button>
-        </div>` : ''}
-      </div>
-      ${bodyHtml}
-    </div>`;
+    bindDynamicEvents(root, r, readerImages);
   }
 
-  function renderExamView() {
-    const container = document.getElementById('exam-container');
-    if (!container) return;
-    const termGroups = buildUnitGroups(false);
-    const visibleCount = termGroups.reduce((acc, t) => acc + t.units.reduce((ua, u) => ua + u.twoMarkSection.items.length + u.fiveMarkSection.items.length, 0), 0);
-    updateToolbarSummary(visibleCount);
-
-    if (!termGroups.length) {
-      container.innerHTML = `<div class="q-card"><p>No questions match your current filters. Clear search or reset filters.</p></div>`;
-      return;
+  function initStaticListeners() {
+    const helpBody = document.getElementById('help-modal-body');
+    if (helpBody && guide && guide.helpItems) {
+      helpBody.innerHTML = guide.helpItems
+        .map(
+          (item) => `<div class="modal-item"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.body)}</span></div>`
+        )
+        .join('');
     }
 
-    const isSearching = searchQuery.trim().length > 0;
-    container.innerHTML = termGroups.map((term) => `<section class="exam-term-block">
-      <div>
-        <h2 class="exam-term-title">${escapeHtml(term.title)}</h2>
-        ${term.note ? `<div class="mid1-note" style="margin-top:8px;"><strong>Note:</strong> ${escapeHtml(term.note)}</div>` : ''}
-      </div>
-      ${term.units.map((u) => `<section class="unit-card" id="unit-${u.unitCode}">
-        <div>
-          <div class="unit-head">
-            <div>
-              <div class="unit-kicker">${escapeHtml(u.examTerm)} · ${u.totalQuestions} Questions</div>
-              <h3 class="unit-title">${escapeHtml(u.title)}</h3>
-              <p class="unit-subtitle">${escapeHtml(u.subtitle)}</p>
-            </div>
-            <div class="unit-progress-label">${u.doneQuestions}/${u.totalQuestions} done (${u.percentDone}%)</div>
-          </div>
-          <div class="progress-track" style="margin-top:8px;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${u.percentDone}">
-            <div class="progress-fill unit-done-fill" style="width:${u.percentDone}%"></div>
-          </div>
-        </div>
-        ${marksFilter !== '5' ? renderExamSection(u.twoMarkSection, isSearching) : ''}
-        ${marksFilter !== '2' ? renderExamSection(u.fiveMarkSection, isSearching) : ''}
-      </section>`).join('')}
-    </section>`).join('');
-
-    container.querySelectorAll('[data-toggle-section]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const sid = btn.getAttribute('data-toggle-section');
-        if (expandedSectionIds.has(sid)) expandedSectionIds.delete(sid); else expandedSectionIds.add(sid);
-        renderExamView();
-      });
+    document.getElementById('practice-toggle-btn')?.addEventListener('click', () => {
+      practiceMode = !practiceMode;
+      revealedQuestions = new Set();
+      renderCurrentRoute();
     });
 
-    container.querySelectorAll('[data-sec-expand]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const sid = btn.getAttribute('data-sec-expand');
-        const qList = (btn.getAttribute('data-sec-qs') || '').split(',').map(parseIdToken).filter((v) => v !== null);
-        expandedSectionIds.add(sid);
-        qList.forEach((n) => collapsedExamCards.delete(n));
-        renderExamView();
+    const searchForm = document.getElementById('topbar-search-form');
+    const searchInput = document.getElementById('topbar-search-input');
+    if (searchForm && searchInput) {
+      searchForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const trimmed = searchInput.value.trim();
+        window.location.hash = trimmed ? formatRoute({ page: 'search', query: trimmed }) : '#/all';
       });
-    });
-
-    container.querySelectorAll('[data-sec-collapse]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const sid = btn.getAttribute('data-sec-collapse');
-        const qList = (btn.getAttribute('data-sec-qs') || '').split(',').map(parseIdToken).filter((v) => v !== null);
-        expandedSectionIds.add(sid);
-        qList.forEach((n) => collapsedExamCards.add(n));
-        renderExamView();
-      });
-    });
-
-    bindCardActionListeners(container);
-  }
-
-  function matchesAllQuestionsFilter(q) {
-    if (aqMarks !== 'all' && q.marks !== Number(aqMarks)) return false;
-    if (aqOnlyPending && doneSet.has(q.number)) return false;
-    if (aqOnlyStarred && !starredSet.has(q.number)) return false;
-    const raw = aqSearch.trim().toLowerCase();
-    if (!raw) return true;
-    const haystack = [
-      String(q.number), 'q' + q.number, q.question, q.sourceTag, q.intuition, q.studySource || '',
-      (q.rememberThese || []).join(' '),
-      (q.sections || []).map((s) => (s.label || '') + ' ' + stripHtml(s.html)).join(' '),
-    ].join(' ').toLowerCase();
-    return raw.split(/\s+/).filter(Boolean).every((t) => haystack.includes(t));
-  }
-
-  function renderQuestionOnlyCard(q, opts) {
-    const isDone = doneSet.has(q.number);
-    const isStarred = starredSet.has(q.number);
-    const openAttr = opts.mode === 'study'
-      ? `data-aq-open-study="${q.number}" data-aq-stage="${opts.stageId}"`
-      : `data-aq-open-unit="${q.number}" data-aq-unit="${opts.unitCode}" data-aq-sec="${opts.sectionId}"`;
-
-    return `<article class="q-card ${isDone ? 'done' : ''}" id="${opts.idAttr}">
-      <div class="q-head collapsed">
-        <div style="flex:1 1 320px;">
-          <div class="q-meta">
-            <span><strong>${escapeHtml(opts.metaLead)}</strong></span> ·
-            <span>${escapeHtml(q.sourceTag)}</span> ·
-            <span class="marks-tag ${q.marks === 5 ? 'five' : ''}">${q.marks} marks</span>
-          </div>
-          <h3 class="q-title">${escapeHtml(opts.prefixLabel)}. ${escapeHtml(q.question)}</h3>
-          ${q.questionMathHtml || ''}
-          ${q.orderNote ? `<p class="q-order-note">${escapeHtml(q.orderNote)}</p>` : ''}
-        </div>
-        <div class="q-card-actions">
-          <button type="button" class="btn btn-star" data-aq-star="${q.number}" aria-pressed="${isStarred}">
-            ${isStarred ? '★ Starred' : '☆ Star'}
-          </button>
-          <button type="button" class="btn btn-done" data-aq-done="${q.number}" aria-pressed="${isDone}">
-            ${isDone ? '✓ Done' : 'Mark done'}
-          </button>
-          <button type="button" class="btn btn-view-answer" ${openAttr}>
-            View answer ↗
-          </button>
-        </div>
-      </div>
-    </article>`;
-  }
-
-  function renderAllQuestionsListAndState() {
-    const bodyEl = document.getElementById('aq-sections-body');
-    if (!bodyEl) return;
-
-    const filteredStudy = [];
-    let visibleStudyCount = 0;
-    for (const stage of stages) {
-      const qs = stage.questions.filter(matchesAllQuestionsFilter);
-      if (qs.length) {
-        visibleStudyCount += qs.length;
-        filteredStudy.push({ stage, qs });
-      }
-    }
-
-    const baseTerms = buildUnitGroups(true);
-    const filteredTerms = [];
-    let visibleUnitCount = 0;
-    for (const term of baseTerms) {
-      const units = [];
-      for (const u of term.units) {
-        const twoItems = u.twoMarkSection.items.filter((item) => matchesAllQuestionsFilter(item.question));
-        const fiveItems = u.fiveMarkSection.items.filter((item) => matchesAllQuestionsFilter(item.question));
-        if (!twoItems.length && !fiveItems.length) continue;
-        visibleUnitCount += twoItems.length + fiveItems.length;
-
-        const twoLongGroupsMap = new Map();
-        const twoUngrouped = [];
-        for (const item of twoItems) twoUngrouped.push(item);
-
-        const fiveLongGroupsMap = new Map();
-        const fiveUngrouped = [];
-        for (const item of fiveItems) {
-          if (item.parsedTag.kind === 'long') {
-            const gNum = item.parsedTag.bankNumber;
-            if (!fiveLongGroupsMap.has(gNum)) fiveLongGroupsMap.set(gNum, []);
-            fiveLongGroupsMap.get(gNum).push(item);
-          } else {
-            fiveUngrouped.push(item);
+      searchInput.addEventListener('input', () => {
+        const cur = parseRoute(window.location.hash);
+        if (cur.page === 'search') {
+          const target = formatRoute({ page: 'search', query: searchInput.value });
+          try {
+            window.history.replaceState(null, '', target);
+          } catch {
+            window.location.hash = target;
           }
+          renderCurrentRoute();
         }
-        const fiveLongGroups = Array.from(fiveLongGroupsMap.entries())
-          .sort((a, b) => a[0] - b[0])
-          .map(([groupNumber, questions], idx) => ({
-            groupNumber,
-            groupLabel: `Long Q${idx + 1}`,
-            questions,
-          }));
+      });
+    }
 
-        units.push({
-          ...u,
-          twoSection: { ...u.twoMarkSection, items: twoItems, ungroupedItems: twoUngrouped, longGroups: [] },
-          fiveSection: { ...u.fiveMarkSection, items: fiveItems, ungroupedItems: fiveUngrouped, longGroups: fiveLongGroups },
-        });
+    const helpModal = document.getElementById('help-modal');
+    const closeHelp = () => { if (helpModal) helpModal.hidden = true; };
+    document.getElementById('help-btn')?.addEventListener('click', () => { if (helpModal) helpModal.hidden = false; });
+    document.getElementById('close-help-btn')?.addEventListener('click', closeHelp);
+    document.getElementById('modal-close-footer-btn')?.addEventListener('click', closeHelp);
+    document.getElementById('modal-open-guide-link')?.addEventListener('click', closeHelp);
+    document.getElementById('modal-open-sources-link')?.addEventListener('click', closeHelp);
+    helpModal?.addEventListener('click', (e) => { if (e.target === helpModal) closeHelp(); });
+    document.getElementById('modal-theme-btn')?.addEventListener('click', () => {
+      applyTheme(theme === 'dark' ? 'light' : 'dark');
+      renderCurrentRoute();
+    });
+
+    const lightboxModal = document.getElementById('lightbox-modal');
+    document.getElementById('lightbox-close-btn')?.addEventListener('click', closeLightbox);
+    lightboxModal?.addEventListener('click', (e) => { if (e.target === lightboxModal) closeLightbox(); });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeHelp();
+        closeLightbox();
       }
-      if (units.length) filteredTerms.push({ ...term, units });
-    }
-
-    document.querySelectorAll('[data-aq-scope]').forEach((btn) => {
-      const val = btn.getAttribute('data-aq-scope');
-      const isAct = val === aqScope;
-      btn.classList.toggle('active', isAct);
-      btn.setAttribute('aria-pressed', String(isAct));
-    });
-    document.querySelectorAll('[data-aq-mark]').forEach((btn) => {
-      const val = btn.getAttribute('data-aq-mark');
-      const isAct = val === aqMarks;
-      btn.classList.toggle('active', isAct);
-      btn.setAttribute('aria-pressed', String(isAct));
-    });
-    const starBtn = document.getElementById('aq-starred-btn');
-    if (starBtn) {
-      starBtn.textContent = `★ Starred (${starredSet.size})`;
-      starBtn.setAttribute('aria-pressed', String(aqOnlyStarred));
-    }
-    const hideDoneBtn = document.getElementById('aq-hide-done-btn');
-    if (hideDoneBtn) hideDoneBtn.setAttribute('aria-pressed', String(aqOnlyPending));
-    const resetBtn = document.getElementById('aq-reset-filters-btn');
-    if (resetBtn) {
-      const hasF = Boolean(aqSearch.trim() || aqMarks !== 'all' || aqOnlyPending || aqOnlyStarred);
-      resetBtn.hidden = !hasF;
-    }
-
-    const jumpRow = document.getElementById('aq-jump-row');
-    if (jumpRow) {
-      jumpRow.hidden = aqScope !== 'both';
-      if (aqScope === 'both') {
-        jumpRow.innerHTML = `<a class="guide-anchor-pill" href="#all-questions-study-section">1. Study Order Questions (${visibleStudyCount})</a>
-          <a class="guide-anchor-pill" href="#all-questions-unit-section">2. Unit-wise Questions (${visibleUnitCount})</a>`;
-      }
-    }
-
-    let html = '';
-    if (aqScope === 'both' || aqScope === 'study') {
-      html += `<section id="all-questions-study-section" class="aq-stack" aria-labelledby="all-questions-study-heading">
-        <div class="aq-section-head">
-          <div>
-            <h2 id="all-questions-study-heading">Study Order Questions (${visibleStudyCount})</h2>
-            <p>All ${stages.length} learning stages (Parts A–E) expanded in sequence.</p>
-          </div>
-          ${aqScope === 'both' ? '<a class="btn-text-link" href="#all-questions-unit-section">Jump to Unit-wise Questions ↓</a>' : ''}
-        </div>
-        ${!filteredStudy.length
-          ? '<div class="q-card"><p>No Study Order questions match your filters.</p></div>'
-          : filteredStudy.map(({ stage, qs }) => {
-              const doneInStage = qs.filter((q) => doneSet.has(q.number)).length;
-              const qRange = qs.length === 1 ? `Q${qs[0].number}` : `Q${qs[0].number}–Q${qs[qs.length - 1].number}`;
-              return `<div class="aq-stage-card">
-                <div class="aq-stage-head">
-                  <div class="stage-meta">
-                    <span class="stage-part-text">Part ${stage.part} · ${escapeHtml(stage.partTitle)}</span> · ${qRange} · ${doneInStage}/${qs.length} done
-                  </div>
-                  <h3 class="aq-stage-title">Stage ${stage.id}. ${escapeHtml(stage.title)}</h3>
-                </div>
-                <div class="aq-list">
-                  ${qs.map((q) => renderQuestionOnlyCard(q, {
-                    mode: 'study',
-                    stageId: stage.id,
-                    idAttr: `aq-study-${q.number}`,
-                    prefixLabel: String(q.number),
-                    metaLead: `Question ${q.number}`,
-                  })).join('')}
-                </div>
-              </div>`;
-            }).join('')}
-      </section>`;
-    }
-
-    if (aqScope === 'both' || aqScope === 'units') {
-      const renderSectionBox = (sec, unitCode) => {
-        if (!sec.items.length) {
-          return `<div class="exam-section" style="padding:14px;">
-            <strong style="font-size:0.94rem;">${escapeHtml(sec.title)} (0)</strong>
-            <p style="margin:4px 0 0;color:var(--ink-subtle);font-style:italic;font-size:0.84rem;">No matching ${sec.marks}-mark questions in this unit.</p>
-          </div>`;
-        }
-        const ungroupedHtml = sec.ungroupedItems.map((item) =>
-          renderQuestionOnlyCard(item.question, {
-            mode: 'units',
-            unitCode,
-            sectionId: sec.id,
-            idAttr: `aq-unit-${item.question.number}`,
-            prefixLabel: item.sectionNumberPrefix,
-            metaLead: item.parsedTag.bankLabel,
-          })
-        ).join('');
-        const longHtml = sec.longGroups.map((g) => `<div class="long-group">
-          <div class="long-group-label">${escapeHtml(g.groupLabel)} · Sub-questions (a) and (b)</div>
-          ${g.questions.map((item) =>
-            renderQuestionOnlyCard(item.question, {
-              mode: 'units',
-              unitCode,
-              sectionId: sec.id,
-              idAttr: `aq-unit-${item.question.number}`,
-              prefixLabel: item.sectionNumberPrefix,
-              metaLead: item.parsedTag.bankLabel,
-            })
-          ).join('')}
-        </div>`).join('');
-
-        return `<div class="exam-section">
-          <div class="exam-section-head">
-            <strong style="font-size:0.95rem;">${escapeHtml(sec.title)} (${sec.items.length})</strong>
-          </div>
-          <div class="exam-section-body">${ungroupedHtml}${longHtml}</div>
-        </div>`;
-      };
-
-      html += `<section id="all-questions-unit-section" class="aq-stack" aria-labelledby="all-questions-unit-heading">
-        <div class="aq-section-head">
-          <div>
-            <h2 id="all-questions-unit-heading">Unit-wise Questions (${visibleUnitCount})</h2>
-            <p>Mid 1 (Units I–II) and Mid 2 (Units III–V), separated into 2-Mark and 5-Mark sections with sequential numbering from 1.</p>
-          </div>
-          ${aqScope === 'both' ? '<a class="btn-text-link" href="#all-questions-study-section">Back to Study Order Questions ↑</a>' : ''}
-        </div>
-        ${!filteredTerms.length
-          ? '<div class="q-card"><p>No Unit-wise questions match your filters.</p></div>'
-          : filteredTerms.map((term) => `<div class="exam-term-block">
-              <h3 class="exam-term-title" style="font-size:1.18rem;">${escapeHtml(term.title)}</h3>
-              ${term.units.map((u) => `<div class="unit-card">
-                <div class="unit-head">
-                  <div>
-                    <div class="unit-kicker">${escapeHtml(u.examTerm)} · ${u.totalQuestions} Questions</div>
-                    <h4 class="unit-title">${escapeHtml(u.title)}</h4>
-                  </div>
-                  <div class="unit-progress-label">${u.doneQuestions}/${u.totalQuestions} done</div>
-                </div>
-                ${aqMarks !== '5' ? renderSectionBox(u.twoSection, u.unitCode) : ''}
-                ${aqMarks !== '2' ? renderSectionBox(u.fiveSection, u.unitCode) : ''}
-              </div>`).join('')}
-            </div>`).join('')}
-      </section>`;
-    }
-
-    bodyEl.innerHTML = html;
-
-    bodyEl.querySelectorAll('[data-aq-done]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const num = parseIdToken(btn.getAttribute('data-aq-done'));
-        if (num === null) return;
-        if (doneSet.has(num)) doneSet.delete(num); else doneSet.add(num);
-        saveIdList(DONE_KEY, doneSet);
-        renderSidebar();
-        renderAllQuestionsListAndState();
-      });
     });
 
-    bodyEl.querySelectorAll('[data-aq-star]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const num = parseIdToken(btn.getAttribute('data-aq-star'));
-        if (num === null) return;
-        if (starredSet.has(num)) starredSet.delete(num); else starredSet.add(num);
-        saveIdList(STAR_KEY, starredSet);
-        renderAllQuestionsListAndState();
-      });
-    });
-
-    bodyEl.querySelectorAll('[data-aq-open-study]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const qNum = parseIdToken(btn.getAttribute('data-aq-open-study'));
-        const sid = Number(btn.getAttribute('data-aq-stage'));
-        if (qNum === null) return;
-        activeView = 'stages';
-        viewMode = 'study';
-        if (selectedStageId !== 'all' && selectedStageId !== sid) selectedStageId = 'all';
-        expandedStages.add(sid);
-        syncViewModeUrlAndStorage();
-        renderAll();
-        scrollToQuestionElement(qNum);
-      });
-    });
-
-    bodyEl.querySelectorAll('[data-aq-open-unit]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const qNum = parseIdToken(btn.getAttribute('data-aq-open-unit'));
-        const unitCode = btn.getAttribute('data-aq-unit');
-        const sectionId = btn.getAttribute('data-aq-sec');
-        if (qNum === null) return;
-        activeView = 'stages';
-        viewMode = 'units';
-        if (selectedUnitCode !== 'all' && selectedUnitCode !== unitCode) selectedUnitCode = 'all';
-        if (sectionId) expandedSectionIds.add(sectionId);
-        collapsedExamCards.delete(qNum);
-        syncViewModeUrlAndStorage();
-        renderAll();
-        scrollToQuestionElement(qNum);
-      });
+    window.addEventListener('hashchange', () => {
+      closeHelp();
+      closeLightbox();
+      renderCurrentRoute();
+      window.scrollTo({ top: 0, behavior: 'instant' });
     });
   }
-
-  function renderAllQuestionsView() {
-    const container = document.getElementById('all-questions-container');
-    if (!container) return;
-
-    if (!aqShellBuilt) {
-      container.innerHTML = `<div class="aq-stack">
-        <section class="guide-card">
-          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
-            <button type="button" class="btn btn-outline" id="aq-back-btn">← Back to Questions with Answers</button>
-            <div class="filter-tabs" role="group" aria-label="Choose question list section">
-              <button type="button" class="tab-btn active" data-aq-scope="both" aria-pressed="true">Study Order + Unit-wise</button>
-              <button type="button" class="tab-btn" data-aq-scope="study" aria-pressed="false">Study Order (${totalQuestionCount})</button>
-              <button type="button" class="tab-btn" data-aq-scope="units" aria-pressed="false">Unit-wise (${totalQuestionCount})</button>
-            </div>
-          </div>
-          <div>
-            <div class="unit-kicker" style="text-transform:uppercase;letter-spacing:0.04em;">Complete Question Bank (${totalQuestionCount} Questions)</div>
-            <h1 style="margin-top:2px;">All Questions (Study Order &amp; Unit-wise)</h1>
-            <p style="margin-top:4px;">Every question from the course bank in exact wording and layout—arranged both in Study Order and Unit-wise Exam Order without answers, so you can scan or test yourself across all ${totalQuestionCount} questions.</p>
-          </div>
-          <div class="guide-anchors" id="aq-jump-row"></div>
-          <div class="toolbar-filters">
-            <div class="search-wrap">
-              <label for="aq-search-input" class="sr-only">Filter all questions</label>
-              <input type="search" id="aq-search-input" placeholder="Filter all questions by keyword, Q#, or tag..." />
-            </div>
-            <div class="filter-tabs" role="group" aria-label="Filter all questions by marks">
-              <button type="button" class="tab-btn active" data-aq-mark="all" aria-pressed="true">All marks</button>
-              <button type="button" class="tab-btn" data-aq-mark="2" aria-pressed="false">2-mark</button>
-              <button type="button" class="tab-btn" data-aq-mark="5" aria-pressed="false">5-mark</button>
-            </div>
-            <button type="button" id="aq-starred-btn" class="btn btn-star-filter" aria-pressed="false">★ Starred (0)</button>
-            <button type="button" id="aq-hide-done-btn" class="btn btn-outline" aria-pressed="false">Hide done</button>
-            <button type="button" id="aq-reset-filters-btn" class="btn-text-link" hidden>Reset filters</button>
-          </div>
-        </section>
-        <div id="aq-sections-body" class="aq-stack"></div>
-      </div>`;
-
-      document.getElementById('aq-back-btn')?.addEventListener('click', () => {
-        activeView = 'stages';
-        syncViewModeUrlAndStorage();
-        renderAll();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-      container.querySelectorAll('[data-aq-scope]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          aqScope = btn.getAttribute('data-aq-scope');
-          renderAllQuestionsListAndState();
-        });
-      });
-      container.querySelectorAll('[data-aq-mark]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          aqMarks = btn.getAttribute('data-aq-mark');
-          renderAllQuestionsListAndState();
-        });
-      });
-      document.getElementById('aq-search-input')?.addEventListener('input', (e) => {
-        aqSearch = e.target.value;
-        renderAllQuestionsListAndState();
-      });
-      document.getElementById('aq-starred-btn')?.addEventListener('click', () => {
-        aqOnlyStarred = !aqOnlyStarred;
-        renderAllQuestionsListAndState();
-      });
-      document.getElementById('aq-hide-done-btn')?.addEventListener('click', () => {
-        aqOnlyPending = !aqOnlyPending;
-        renderAllQuestionsListAndState();
-      });
-      document.getElementById('aq-reset-filters-btn')?.addEventListener('click', () => {
-        aqSearch = '';
-        aqMarks = 'all';
-        aqOnlyPending = false;
-        aqOnlyStarred = false;
-        const inp = document.getElementById('aq-search-input');
-        if (inp) inp.value = '';
-        renderAllQuestionsListAndState();
-      });
-      aqShellBuilt = true;
-    }
-
-    renderAllQuestionsListAndState();
-  }
-
-  function renderMainQuestionArea() {
-    const stagesCont = document.getElementById('stages-container');
-    const examCont = document.getElementById('exam-container');
-    if (viewMode === 'units') {
-      if (stagesCont) stagesCont.hidden = true;
-      if (examCont) examCont.hidden = false;
-      renderExamView();
-    } else {
-      if (stagesCont) stagesCont.hidden = false;
-      if (examCont) examCont.hidden = true;
-      renderStages();
-    }
-  }
-
-  function renderAll() {
-    const stagesView = document.getElementById('stages-view');
-    const guideView = document.getElementById('guide-container');
-    const allQView = document.getElementById('all-questions-container');
-    renderHeaderAndViewSwitch();
-    renderSidebar();
-    if (activeView === 'questions') {
-      stagesView.hidden = true;
-      guideView.hidden = true;
-      if (allQView) allQView.hidden = false;
-      renderAllQuestionsView();
-    } else if (activeView === 'stages') {
-      stagesView.hidden = false;
-      guideView.hidden = true;
-      if (allQView) allQView.hidden = true;
-      renderMainQuestionArea();
-    } else {
-      stagesView.hidden = true;
-      guideView.hidden = false;
-      if (allQView) allQView.hidden = true;
-      renderGuideView();
-    }
-  }
-
-  function handleSwitchView(targetMode) {
-    const currentQ = activeView === 'stages' ? findCurrentReadingQuestionNumber() : null;
-    activeView = 'stages';
-    viewMode = targetMode;
-    syncViewModeUrlAndStorage();
-    if (currentQ !== null) {
-      ensureQuestionVisibleInView(currentQ, targetMode);
-    }
-    renderAll();
-    if (currentQ !== null) {
-      scrollToQuestionElement(currentQ);
-    }
-  }
-
-  function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('sidebar-backdrop').hidden = true;
-  }
-
-  function openHelpModal() {
-    document.getElementById('help-modal').hidden = false;
-  }
-
-  function closeHelpModal() {
-    document.getElementById('help-modal').hidden = true;
-  }
-
-  document.getElementById('switch-study-btn')?.addEventListener('click', () => handleSwitchView('study'));
-  document.getElementById('switch-units-btn')?.addEventListener('click', () => handleSwitchView('units'));
-  document.getElementById('open-all-questions-btn')?.addEventListener('click', () => {
-    activeView = 'questions';
-    syncViewModeUrlAndStorage();
-    renderAll();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
-  document.getElementById('theme-toggle-btn')?.addEventListener('click', () => {
-    applyTheme(theme === 'dark' ? 'light' : 'dark');
-  });
-
-  window.addEventListener('hashchange', () => {
-    const rawHash = window.location.hash.trim().toLowerCase();
-    if (rawHash === '#questions') {
-      activeView = 'questions';
-      syncViewModeUrlAndStorage();
-      renderAll();
-      return;
-    }
-    const parsed = parseViewHash(window.location.hash);
-    if (parsed && (parsed !== viewMode || activeView === 'questions')) {
-      viewMode = parsed;
-      activeView = 'stages';
-      syncViewModeUrlAndStorage();
-      renderAll();
-    }
-  });
-
-  document.getElementById('search-input').addEventListener('input', (e) => {
-    searchQuery = e.target.value;
-    renderMainQuestionArea();
-  });
-
-  document.querySelectorAll('.tab-btn[data-mark]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn[data-mark]').forEach((b) => {
-        b.classList.remove('active');
-        b.setAttribute('aria-pressed', 'false');
-      });
-      btn.classList.add('active');
-      btn.setAttribute('aria-pressed', 'true');
-      marksFilter = btn.getAttribute('data-mark');
-      renderMainQuestionArea();
-    });
-  });
-
-  document.getElementById('starred-only-btn')?.addEventListener('click', (e) => {
-    onlyStarred = !onlyStarred;
-    e.currentTarget.setAttribute('aria-pressed', String(onlyStarred));
-    renderMainQuestionArea();
-  });
-
-  document.getElementById('hide-done-btn').addEventListener('click', (e) => {
-    onlyPending = !onlyPending;
-    e.currentTarget.setAttribute('aria-pressed', String(onlyPending));
-    renderMainQuestionArea();
-  });
-
-  document.getElementById('practice-toggle-btn').addEventListener('click', (e) => {
-    practiceMode = !practiceMode;
-    revealedQuestions.clear();
-    e.currentTarget.setAttribute('aria-pressed', String(practiceMode));
-    e.currentTarget.textContent = `Practice mode: ${practiceMode ? 'On' : 'Off'}`;
-    renderMainQuestionArea();
-  });
-
-  document.getElementById('expand-all-btn').addEventListener('click', () => {
-    if (viewMode === 'units') {
-      if (expandedSectionIds.size === ALL_UNIT_SECTION_IDS.length) {
-        expandedSectionIds = new Set();
-      } else {
-        expandedSectionIds = new Set(ALL_UNIT_SECTION_IDS);
-        collapsedExamCards.clear();
-      }
-      renderExamView();
-      return;
-    }
-    if (expandedStages.size === stages.length) {
-      expandedStages = new Set([1]);
-    } else {
-      expandedStages = new Set(stages.map((s) => s.id));
-    }
-    renderStages();
-  });
-
-  document.getElementById('reset-progress-btn').addEventListener('click', () => {
-    doneSet.clear();
-    saveIdList(DONE_KEY, doneSet);
-    renderAll();
-  });
-
-  document.getElementById('mobile-menu-btn').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.add('open');
-    document.getElementById('sidebar-backdrop').hidden = false;
-  });
-  document.getElementById('close-sidebar-btn').addEventListener('click', closeSidebar);
-  document.getElementById('sidebar-backdrop').addEventListener('click', closeSidebar);
-
-  document.getElementById('dismiss-quick-start-btn')?.addEventListener('click', () => {
-    document.getElementById('quick-start-box').hidden = true;
-  });
-  document.getElementById('qs-open-guide-btn')?.addEventListener('click', () => {
-    activeView = 'guide';
-    renderAll();
-  });
-  document.getElementById('qs-open-sources-btn')?.addEventListener('click', () => {
-    activeView = 'sources';
-    renderAll();
-  });
-
-  document.getElementById('help-btn')?.addEventListener('click', openHelpModal);
-  document.getElementById('close-help-btn')?.addEventListener('click', closeHelpModal);
-  document.getElementById('modal-close-footer-btn')?.addEventListener('click', closeHelpModal);
-  document.getElementById('modal-open-guide-btn')?.addEventListener('click', () => {
-    closeHelpModal();
-    activeView = 'guide';
-    renderAll();
-  });
-  document.getElementById('modal-open-sources-btn')?.addEventListener('click', () => {
-    closeHelpModal();
-    activeView = 'sources';
-    renderAll();
-  });
-  document.getElementById('help-modal')?.addEventListener('click', (e) => {
-    if (e.target.id === 'help-modal') closeHelpModal();
-  });
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeHelpModal();
-  });
-
-  document.getElementById('desktop-sidebar-toggle-btn')?.addEventListener('click', () => {
-    applyDesktopSidebar(!desktopSidebarOpen);
-  });
-  document.getElementById('desktop-sidebar-collapse-btn')?.addEventListener('click', () => {
-    applyDesktopSidebar(false);
-  });
-
-  document.getElementById('brand-reset-stage').addEventListener('click', (e) => {
-    e.preventDefault();
-    activeView = 'stages';
-    selectedStageId = 'all';
-    selectedUnitCode = 'all';
-    syncViewModeUrlAndStorage();
-    renderAll();
-  });
 
   applyTheme(theme);
-  applyDesktopSidebar(desktopSidebarOpen);
-  syncViewModeUrlAndStorage();
-  renderQuickStartAndHelp();
-  renderAll();
+  if (!window.location.hash) {
+    try {
+      window.history.replaceState(null, '', '#/');
+    } catch {
+      window.location.hash = '#/';
+    }
+  }
+  initStaticListeners();
+  renderCurrentRoute();
 })();

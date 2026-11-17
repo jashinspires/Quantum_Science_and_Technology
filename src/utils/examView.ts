@@ -88,32 +88,37 @@ export interface UnitFilterCriteria {
 
 export const UNIT_METADATA: Record<
   UnitCode,
-  { examTerm: ExamTerm; title: string; subtitle: string }
+  { examTerm: ExamTerm; syllabusTitle: string; title: string; subtitle: string }
 > = {
   I: {
     examTerm: 'Mid 1',
-    title: 'Unit I — Foundations of Quantum Mechanics',
-    subtitle: 'Blackbody/photoelectric/Compton foundations, de Broglie waves, Hilbert space, operators, Schrödinger equation & step potential.',
+    syllabusTitle: 'Fundamentals of Quantum Mechanics',
+    title: 'Unit I — Fundamentals of Quantum Mechanics',
+    subtitle: 'Early quantum theory, wave and particle duality, Schrödinger equation, potential steps, operators, and uncertainty relations.',
   },
   II: {
     examTerm: 'Mid 1',
-    title: 'Unit II — Qubits, Dirac Notation & Quantum Gates',
-    subtitle: 'Dirac notation, Bloch sphere, superposition, Pauli/T/CNOT gates, tensor products, H+CNOT circuits & no-cloning.',
+    syllabusTitle: 'Quantum Information Theory',
+    title: 'Unit II — Quantum Information Theory',
+    subtitle: 'Qubits, Bloch sphere, superposition, Dirac notation, quantum gates, circuits, Bell entanglement, teleportation, and no cloning.',
   },
   III: {
     examTerm: 'Mid 2',
-    title: 'Unit III — Quantum Algorithms & Error Correction',
-    subtitle: 'Classical vs quantum computing, parallelism, Deutsch–Jozsa, Grover, QFT, Shor’s algorithm, QEC codes & Qiskit.',
+    syllabusTitle: 'Quantum Computing',
+    title: 'Unit III — Quantum Computing',
+    subtitle: 'Quantum parallelism, Deutsch Jozsa, Grover search, Quantum Fourier Transform, Shor factoring, error correction, and Qiskit.',
   },
   IV: {
     examTerm: 'Mid 2',
-    title: 'Unit IV — Quantum Cryptography & Communication',
-    subtitle: 'BB84 & E91 QKD, eavesdropping, quantum teleportation, dense coding, entanglement swapping, repeaters & hardware loss.',
+    syllabusTitle: 'Quantum Communication',
+    title: 'Unit IV — Quantum Communication',
+    subtitle: 'Quantum cryptography, BB84 and E91 key distribution, eavesdropping detection, dense coding, quantum repeaters, and channel noise.',
   },
   V: {
     examTerm: 'Mid 2',
-    title: 'Unit V — Quantum Sensing, Materials, Hardware & Mission',
-    subtitle: 'Quantum sensors, atomic clocks, ghost imaging, topological insulators, NV centers, qubit platforms, NISQ & NQM.',
+    syllabusTitle: 'Quantum Technologies and Applications',
+    title: 'Unit V — Quantum Technologies and Applications',
+    subtitle: 'Quantum magnetometers, atomic clocks, ghost imaging, topological materials, NV centers, qubit hardware, NISQ, and national missions.',
   },
 };
 

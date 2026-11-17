@@ -461,3 +461,128 @@ test('Study Order and Unit-wise Exam View expose all 107 identical questions wit
   }
 });
 
+import {
+  formatAppRoute,
+  getBreadcrumbs,
+  parseAppRoute,
+  resolveQuestionContext,
+} from './navigation';
+import { UNIT_METADATA } from './examView';
+
+test('hash route parser and formatter support full page-by-page hierarchy and legacy hashes', () => {
+  assert.deepEqual(parseAppRoute(''), { page: 'home' });
+  assert.deepEqual(parseAppRoute('#/'), { page: 'home' });
+  assert.deepEqual(parseAppRoute('#study'), { page: 'study-stages' });
+  assert.deepEqual(parseAppRoute('#units'), { page: 'units-list' });
+  assert.deepEqual(parseAppRoute('#questions'), { page: 'all' });
+
+  const r1 = parseAppRoute('#/study/stage-3/q/10a');
+  assert.deepEqual(r1, { page: 'study-question', stageId: 3, questionNumber: '10a' });
+  assert.equal(formatAppRoute(r1), '#/study/stage-3/q/10a');
+
+  const r2 = parseAppRoute('#/units/III/5/q/35');
+  assert.deepEqual(r2, { page: 'unit-question', unitCode: 'III', marks: 5, questionNumber: 35 });
+  assert.equal(formatAppRoute(r2), '#/units/III/5/q/35');
+
+  const r3 = parseAppRoute('#/search?q=bloch%20sphere');
+  assert.deepEqual(r3, { page: 'search', query: 'bloch sphere' });
+  assert.equal(formatAppRoute(r3), '#/search?q=bloch%20sphere');
+});
+
+test('breadcrumbs and sequential Previous/Next context work across Study Order and Unit-wise lists', () => {
+  const locMap = getQuestionLocationMap(ALL_STAGES);
+  const unitGroups = buildUnitExamGroups(ALL_STAGES).flatMap((t) => t.units);
+
+  const studyRoute = parseAppRoute('#/study/stage-1/q/1a');
+  assert.equal(studyRoute.page, 'study-question');
+  if (studyRoute.page === 'study-question') {
+    const crumbs = getBreadcrumbs(studyRoute, locMap).map((c) => c.label);
+    assert.deepEqual(crumbs, ['Home', 'Study Order', 'Stage 1', 'Q1a']);
+    const ctx = resolveQuestionContext(ALL_STAGES, studyRoute, locMap, unitGroups)!;
+    assert.equal(ctx.backToListHash, '#/study/stage-1');
+    assert.equal(ctx.prevQuestion?.questionNumber, 1);
+    assert.equal(ctx.nextQuestion?.questionNumber, '1b');
+  }
+
+  const unitRoute = parseAppRoute('#/units/III/5/q/35');
+  assert.equal(unitRoute.page, 'unit-question');
+  if (unitRoute.page === 'unit-question') {
+    const crumbs = getBreadcrumbs(unitRoute, locMap).map((c) => c.label);
+    assert.equal(crumbs[0], 'Home');
+    assert.equal(crumbs[1], 'Unit-wise');
+    assert.equal(crumbs[2], 'Unit III');
+    assert.equal(crumbs[3], '5 Marks');
+    const ctx = resolveQuestionContext(ALL_STAGES, unitRoute, locMap, unitGroups)!;
+    assert.equal(ctx.backToListHash, '#/units/III/5');
+    assert.ok(ctx.listTotal === 12);
+    assert.ok(ctx.prevQuestion || ctx.nextQuestion);
+  }
+});
+
+test('UNIT_METADATA matches verbatim syllabus titles and 12-18 word unit descriptions', () => {
+  assert.deepEqual(
+    {
+      I: UNIT_METADATA.I.syllabusTitle,
+      II: UNIT_METADATA.II.syllabusTitle,
+      III: UNIT_METADATA.III.syllabusTitle,
+      IV: UNIT_METADATA.IV.syllabusTitle,
+      V: UNIT_METADATA.V.syllabusTitle,
+    },
+    {
+      I: 'Fundamentals of Quantum Mechanics',
+      II: 'Quantum Information Theory',
+      III: 'Quantum Computing',
+      IV: 'Quantum Communication',
+      V: 'Quantum Technologies and Applications',
+    }
+  );
+
+  for (const unitCode of ['I', 'II', 'III', 'IV', 'V'] as const) {
+    const wc = UNIT_METADATA[unitCode].subtitle.trim().split(/\s+/).length;
+    assert.ok(
+      wc >= 12 && wc <= 18,
+      `Unit ${unitCode} description should be 12-18 words, got ${wc}`
+    );
+  }
+});
+
+test('Stage question totals equal Unit-wise question totals and match total across data', () => {
+  const stageTotal = ALL_STAGES.reduce((acc, s) => acc + s.questions.length, 0);
+  const unitGroups = buildUnitExamGroups(ALL_STAGES).flatMap((t) => t.units);
+  const unitTotal = unitGroups.reduce(
+    (acc, u) => acc + u.twoMarkSection.items.length + u.fiveMarkSection.items.length,
+    0
+  );
+  assert.equal(stageTotal, unitTotal);
+  assert.ok(stageTotal > 0);
+});
+
+test('no old removed UI labels or sidebar copy remain in src or offline-study', () => {
+  const forbiddenRe =
+    /Write this in the exam|Remember these|Source \(for study|Four Clear Card Sections|Show menu|Hide menu/;
+
+  const walk = (dir: string, acc: string[] = []): string[] => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'images' && entry.name !== 'node_modules' && entry.name !== 'dist') {
+          walk(full, acc);
+        }
+      } else if (/\.(ts|tsx|js|html|css)$/i.test(entry.name) && entry.name !== 'studyLogic.test.ts') {
+        acc.push(full);
+      }
+    }
+    return acc;
+  };
+
+  const files = [
+    ...walk(path.resolve(process.cwd(), 'src')),
+    ...walk(path.resolve(process.cwd(), 'offline-study')),
+  ];
+  for (const file of files) {
+    const content = fs.readFileSync(file, 'utf8');
+    assert.doesNotMatch(content, forbiddenRe, `Found forbidden removed label in ${file}`);
+  }
+});
+
+

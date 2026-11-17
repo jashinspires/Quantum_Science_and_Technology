@@ -11,8 +11,18 @@ html.dark {
   color-scheme: dark;
 }
 
+html {
+  font-size: 16px;
+}
+
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 body {
   font-family: var(--font-sans);
+  font-size: 1rem;
   background-color: #f8fafc;
   color: #0f172a;
   line-height: 1.65;
@@ -22,6 +32,12 @@ body {
 html.dark body {
   background-color: #020617;
   color: #f1f5f9;
+}
+
+.page-shell {
+  width: min(1480px, 96%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .font-mono-math {
@@ -36,7 +52,7 @@ html.dark body {
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
   margin: 0.75rem 0;
-  font-size: 0.925rem;
+  font-size: 0.94rem;
   line-height: 1.7;
   overflow-x: auto;
   color: #0f172a;
@@ -51,7 +67,7 @@ html.dark .math-block {
 pre.math-block {
   white-space: pre;
   line-height: 1.45;
-  font-size: 0.84rem;
+  font-size: 0.875rem;
 }
 
 .math-inline {
@@ -79,7 +95,7 @@ html.dark .math-inline {
   border-collapse: separate;
   border-spacing: 0.55rem 0.15rem;
   font-family: var(--font-mono);
-  font-size: 0.9em;
+  font-size: 0.92em;
 }
 
 html.dark .q-matrix {
@@ -96,7 +112,7 @@ html.dark .q-matrix {
   width: 100%;
   border-collapse: collapse;
   margin: 0.75rem 0;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 @media (max-width: 640px) {
@@ -110,7 +126,7 @@ html.dark .q-matrix {
 .q-table th,
 .q-table td {
   border: 1px solid #e2e8f0;
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.75rem;
   text-align: left;
   vertical-align: top;
 }
@@ -131,8 +147,13 @@ html.dark .q-table th {
   color: #f8fafc;
 }
 
+.answer-prose {
+  font-size: 1.09375rem; /* 17.5px */
+  line-height: 1.72;
+}
+
 .answer-prose p {
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.7rem;
 }
 
 .answer-prose p:last-child {
@@ -141,11 +162,11 @@ html.dark .q-table th {
 
 .answer-prose ul,
 .answer-prose ol {
-  margin: 0.5rem 0 0.75rem 1.25rem;
+  margin: 0.5rem 0 0.85rem 1.35rem;
 }
 
 .answer-prose li {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.35rem;
 }
 
 .answer-prose ul {
@@ -158,7 +179,7 @@ html.dark .q-table th {
 
 .textbook-note {
   display: inline-block;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #92400e;
   background-color: #fef3c7;
@@ -172,4 +193,31 @@ html.dark .textbook-note {
   color: #fde68a;
   background-color: #451a03;
   border-color: #78350f;
+}
+
+/* Responsive Answer + Figures layout: side-by-side at >= 1100px */
+.answer-split-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .answer-split-layout.has-figures {
+    grid-template-columns: minmax(0, 1.38fr) minmax(320px, 0.92fr);
+    gap: 2rem;
+  }
+  .answer-figures-col {
+    position: sticky;
+    top: 4.5rem;
+  }
+}
+
+.figure-img-capped {
+  max-width: 100%;
+  max-height: 55vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
